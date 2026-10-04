@@ -1,0 +1,206 @@
+{
+  "version": "1.0.0",
+  "vocabulary_size": 20,
+  "gestures": [
+    {
+      "id": "HELLO",
+      "name": "Hello",
+      "hindi": "नमस्ते",
+      "category": "Greetings",
+      "description": "Open hand facing forward, slight side wave motion",
+      "is_dynamic": true,
+      "finger_profile": { "thumb": 0.05, "index": 0.05, "middle": 0.05, "ring": 0.05, "little": 0.05 },
+      "imu_profile": { "acc_x": 0.0, "acc_y": 0.98, "acc_z": 0.15, "gyro_x": 0.05, "gyro_y": 0.45, "gyro_z": -0.1 }
+    },
+    {
+      "id": "THANK_YOU",
+      "name": "Thank You",
+      "hindi": "धन्यवाद",
+      "category": "Greetings",
+      "description": "Flat open hand moving outward from chin towards observer",
+      "is_dynamic": true,
+      "finger_profile": { "thumb": 0.1, "index": 0.05, "middle": 0.05, "ring": 0.05, "little": 0.05 },
+      "imu_profile": { "acc_x": -0.2, "acc_y": 0.85, "acc_z": 0.45, "gyro_x": 0.35, "gyro_y": 0.0, "gyro_z": 0.0 }
+    },
+    {
+      "id": "PLEASE",
+      "name": "Please",
+      "hindi": "कृपया",
+      "category": "Basic Communication",
+      "description": "Flat hand resting on chest, gentle circular motion",
+      "is_dynamic": false,
+      "finger_profile": { "thumb": 0.15, "index": 0.05, "middle": 0.05, "ring": 0.05, "little": 0.05 },
+      "imu_profile": { "acc_x": 0.05, "acc_y": 0.95, "acc_z": -0.25, "gyro_x": 0.02, "gyro_y": 0.02, "gyro_z": 0.01 }
+    },
+    {
+      "id": "YES",
+      "name": "Yes",
+      "hindi": "हाँ",
+      "category": "Basic Communication",
+      "description": "Closed fist tilting up and down like a nodding head",
+      "is_dynamic": true,
+      "finger_profile": { "thumb": 0.9, "index": 0.95, "middle": 0.95, "ring": 0.95, "little": 0.95 },
+      "imu_profile": { "acc_x": 0.1, "acc_y": 0.7, "acc_z": 0.65, "gyro_x": 0.85, "gyro_y": 0.0, "gyro_z": 0.0 }
+    },
+    {
+      "id": "NO",
+      "name": "No",
+      "hindi": "नहीं",
+      "category": "Basic Communication",
+      "description": "Index and middle extended and closing quickly onto thumb",
+      "is_dynamic": true,
+      "finger_profile": { "thumb": 0.6, "index": 0.5, "middle": 0.5, "ring": 0.95, "little": 0.95 },
+      "imu_profile": { "acc_x": 0.3, "acc_y": 0.85, "acc_z": 0.3, "gyro_x": 0.1, "gyro_y": 0.7, "gyro_z": 0.0 }
+    },
+    {
+      "id": "HELP",
+      "name": "Help",
+      "hindi": "मदद",
+      "category": "Emergency",
+      "description": "Closed fist with thumb extended upward, lifted up",
+      "is_dynamic": true,
+      "finger_profile": { "thumb": 0.05, "index": 0.95, "middle": 0.95, "ring": 0.95, "little": 0.95 },
+      "imu_profile": { "acc_x": 0.0, "acc_y": 0.3, "acc_z": 0.92, "gyro_x": 0.0, "gyro_y": 0.0, "gyro_z": 0.5 }
+    },
+    {
+      "id": "GOOD",
+      "name": "Good",
+      "hindi": "अच्छा",
+      "category": "Basic Communication",
+      "description": "Thumbs up sign held steady with palm inward",
+      "is_dynamic": false,
+      "finger_profile": { "thumb": 0.05, "index": 0.95, "middle": 0.95, "ring": 0.95, "little": 0.95 },
+      "imu_profile": { "acc_x": 0.0, "acc_y": 0.1, "acc_z": 0.98, "gyro_x": 0.0, "gyro_y": 0.0, "gyro_z": 0.0 }
+    },
+    {
+      "id": "BAD",
+      "name": "Bad",
+      "hindi": "बुरा",
+      "category": "Basic Communication",
+      "description": "Thumbs down sign held steady with palm inward",
+      "is_dynamic": false,
+      "finger_profile": { "thumb": 0.05, "index": 0.95, "middle": 0.95, "ring": 0.95, "little": 0.95 },
+      "imu_profile": { "acc_x": 0.0, "acc_y": -0.1, "acc_z": -0.98, "gyro_x": 0.0, "gyro_y": 0.0, "gyro_z": 0.0 }
+    },
+    {
+      "id": "EAT",
+      "name": "Eat / Food",
+      "hindi": "खाना",
+      "category": "Needs & Actions",
+      "description": "All fingers bunched together touching thumb, pointing to mouth",
+      "is_dynamic": true,
+      "finger_profile": { "thumb": 0.5, "index": 0.6, "middle": 0.6, "ring": 0.6, "little": 0.6 },
+      "imu_profile": { "acc_x": -0.4, "acc_y": 0.8, "acc_z": 0.35, "gyro_x": 0.4, "gyro_y": 0.0, "gyro_z": 0.0 }
+    },
+    {
+      "id": "DRINK",
+      "name": "Drink / Water",
+      "hindi": "पानी पीना",
+      "category": "Needs & Actions",
+      "description": "C-shaped hand tilted upwards towards mouth",
+      "is_dynamic": true,
+      "finger_profile": { "thumb": 0.35, "index": 0.4, "middle": 0.4, "ring": 0.4, "little": 0.4 },
+      "imu_profile": { "acc_x": -0.6, "acc_y": 0.5, "acc_z": 0.6, "gyro_x": 0.6, "gyro_y": -0.2, "gyro_z": 0.0 }
+    },
+    {
+      "id": "I_LOVE_YOU",
+      "name": "I Love You",
+      "hindi": "मुझे तुमसे प्यार है",
+      "category": "Basic Communication",
+      "description": "Thumb, index, and little finger extended; middle and ring bent",
+      "is_dynamic": false,
+      "finger_profile": { "thumb": 0.05, "index": 0.05, "middle": 0.95, "ring": 0.95, "little": 0.05 },
+      "imu_profile": { "acc_x": 0.0, "acc_y": 0.95, "acc_z": 0.25, "gyro_x": 0.0, "gyro_y": 0.0, "gyro_z": 0.0 }
+    },
+    {
+      "id": "PEACE",
+      "name": "Peace / Victory",
+      "hindi": "शांति",
+      "category": "Basic Communication",
+      "description": "Index and middle fingers extended in a V-shape, others curled",
+      "is_dynamic": false,
+      "finger_profile": { "thumb": 0.85, "index": 0.05, "middle": 0.05, "ring": 0.95, "little": 0.95 },
+      "imu_profile": { "acc_x": 0.0, "acc_y": 0.92, "acc_z": 0.35, "gyro_x": 0.0, "gyro_y": 0.0, "gyro_z": 0.0 }
+    },
+    {
+      "id": "NAME",
+      "name": "Name",
+      "hindi": "नाम",
+      "category": "Basic Communication",
+      "description": "Index and middle finger extended tapping across opposite fingers",
+      "is_dynamic": true,
+      "finger_profile": { "thumb": 0.8, "index": 0.08, "middle": 0.08, "ring": 0.95, "little": 0.95 },
+      "imu_profile": { "acc_x": 0.2, "acc_y": 0.4, "acc_z": 0.85, "gyro_x": 0.0, "gyro_y": 0.5, "gyro_z": 0.1 }
+    },
+    {
+      "id": "ME",
+      "name": "Me / I",
+      "hindi": "मैं",
+      "category": "Pronouns",
+      "description": "Index finger pointing directly at one's own chest",
+      "is_dynamic": false,
+      "finger_profile": { "thumb": 0.85, "index": 0.05, "middle": 0.95, "ring": 0.95, "little": 0.95 },
+      "imu_profile": { "acc_x": -0.85, "acc_y": 0.4, "acc_z": -0.3, "gyro_x": 0.0, "gyro_y": 0.0, "gyro_z": 0.0 }
+    },
+    {
+      "id": "YOU",
+      "name": "You",
+      "hindi": "आप / तुम",
+      "category": "Pronouns",
+      "description": "Index finger pointing forward at the person spoken to",
+      "is_dynamic": false,
+      "finger_profile": { "thumb": 0.85, "index": 0.05, "middle": 0.95, "ring": 0.95, "little": 0.95 },
+      "imu_profile": { "acc_x": 0.85, "acc_y": 0.4, "acc_z": 0.2, "gyro_x": 0.0, "gyro_y": 0.0, "gyro_z": 0.0 }
+    },
+    {
+      "id": "HOME",
+      "name": "Home",
+      "hindi": "घर",
+      "category": "Needs & Actions",
+      "description": "Fingertips touching palm in an angled roof shape",
+      "is_dynamic": false,
+      "finger_profile": { "thumb": 0.4, "index": 0.35, "middle": 0.35, "ring": 0.35, "little": 0.35 },
+      "imu_profile": { "acc_x": 0.1, "acc_y": 0.7, "acc_z": 0.7, "gyro_x": 0.0, "gyro_y": 0.0, "gyro_z": 0.0 }
+    },
+    {
+      "id": "STOP",
+      "name": "Stop",
+      "hindi": "रुको",
+      "category": "Basic Communication",
+      "description": "Open hand with palm facing directly forward vertically",
+      "is_dynamic": false,
+      "finger_profile": { "thumb": 0.05, "index": 0.05, "middle": 0.05, "ring": 0.05, "little": 0.05 },
+      "imu_profile": { "acc_x": 0.95, "acc_y": 0.25, "acc_z": 0.05, "gyro_x": 0.0, "gyro_y": 0.0, "gyro_z": 0.0 }
+    },
+    {
+      "id": "BATHROOM",
+      "name": "Bathroom / Washroom",
+      "hindi": "शौचालय",
+      "category": "Needs & Actions",
+      "description": "T-handshape with thumb between index and middle, shaking side to side",
+      "is_dynamic": true,
+      "finger_profile": { "thumb": 0.3, "index": 0.85, "middle": 0.95, "ring": 0.95, "little": 0.95 },
+      "imu_profile": { "acc_x": 0.2, "acc_y": 0.8, "acc_z": 0.4, "gyro_x": 0.0, "gyro_y": 0.7, "gyro_z": 0.3 }
+    },
+    {
+      "id": "WELCOME",
+      "name": "Welcome",
+      "hindi": "स्वागत है",
+      "category": "Greetings",
+      "description": "Open hand facing up, sweeping smoothly inward towards body",
+      "is_dynamic": true,
+      "finger_profile": { "thumb": 0.1, "index": 0.1, "middle": 0.1, "ring": 0.1, "little": 0.1 },
+      "imu_profile": { "acc_x": -0.3, "acc_y": 0.6, "acc_z": 0.7, "gyro_x": -0.3, "gyro_y": 0.4, "gyro_z": 0.0 }
+    },
+    {
+      "id": "EMERGENCY",
+      "name": "Emergency",
+      "hindi": "आपातकाल",
+      "category": "Emergency",
+      "description": "Open hand waving back and forth with high angular velocity",
+      "is_dynamic": true,
+      "finger_profile": { "thumb": 0.15, "index": 0.15, "middle": 0.15, "ring": 0.15, "little": 0.15 },
+      "imu_profile": { "acc_x": 0.2, "acc_y": 0.7, "acc_z": 0.5, "gyro_x": 1.2, "gyro_y": 1.4, "gyro_z": 0.8 }
+    }
+  ]
+}

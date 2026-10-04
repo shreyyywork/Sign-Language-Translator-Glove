@@ -1,0 +1,57 @@
+{
+  "app_name": "ISL Glove Recognition System",
+  "version": "1.0.0",
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8000,
+    "websocket_path": "/ws/stream"
+  },
+  "features": [
+    "thumb",
+    "index",
+    "middle",
+    "ring",
+    "little",
+    "acc_x",
+    "acc_y",
+    "acc_z",
+    "gyro_x",
+    "gyro_y",
+    "gyro_z"
+  ],
+  "dataset": {
+    "columns": [
+      "timestamp",
+      "user_id",
+      "gesture",
+      "thumb",
+      "index",
+      "middle",
+      "ring",
+      "little",
+      "acc_x",
+      "acc_y",
+      "acc_z",
+      "gyro_x",
+      "gyro_y",
+      "gyro_z"
+    ],
+    "simulated_dir": "data/simulated",
+    "real_dir": "data/real",
+    "calibration_dir": "data/calibration"
+  },
+  "ml": {
+    "models_dir": "models/saved",
+    "evaluation_dir": "models/evaluation",
+    "confidence_threshold": 0.65,
+    "smoothing_window_size": 5,
+    "dynamic_sequence_length": 30,
+    "default_model_type": "random_forest"
+  },
+  "tts": {
+    "default_language": "en",
+    "supported_languages": ["en", "hi"],
+    "speech_rate": 1.0,
+    "pitch": 1.0
+  }
+}

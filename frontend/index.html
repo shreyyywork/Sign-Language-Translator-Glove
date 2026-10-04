@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en" data-color-mode="dark" data-dark-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>isl-org/isl-glove-recognition: Machine Learning Based Indian Sign Language Recognition Using a Wearable Sensor Glove</title>
+    <meta name="description" content="GitHub Repository: Wearable sensor glove for Indian Sign Language recognition using ESP32, 5 Flex Sensors, MPU6050 IMU, Scikit-Learn and PyTorch models.">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧤</text></svg>">
+</head>
+<body>
+
+    <!-- GitHub Top Navigation Header -->
+    <header class="gh-header">
+        <div class="gh-header-left">
+            <div class="gh-logo-badge">🧤</div>
+            <div class="gh-repo-breadcrumb">
+                <a href="#">isl-org</a>
+                <span class="separator">/</span>
+                <span class="repo-name">isl-glove-recognition</span>
+                <span class="gh-badge-public">Public</span>
+            </div>
+        </div>
+
+        <div class="gh-header-actions">
+            <!-- Hardware / Simulator Segmented Toggle -->
+            <div class="gh-segmented-btn-group">
+                <button id="btnSimMode" class="gh-segment-btn active">
+                    <span id="statusModeDot" class="status-dot sim"></span> Simulator (50Hz)
+                </button>
+                <button id="btnHwMode" class="gh-segment-btn">
+                    <span>🔌</span> ESP32 Hardware
+                </button>
+            </div>
+
+            <!-- Speech Audio Toggle -->
+            <button id="btnToggleTTS" class="btn btn-sm btn-primary">
+                🔊 Audio TTS: ON
+            </button>
+
+            <!-- WebSocket Status Badge -->
+            <span class="Label Label--success" id="wsStatusBadge" style="font-size: 11px;">
+                <span id="wsStatusDot" class="status-dot online"></span>
+                <span id="wsStatusText">Stream Live</span>
+            </span>
+
+            <!-- GitHub Quick Action Pills -->
+            <div class="gh-segmented-btn-group" style="display: flex;">
+                <button class="gh-segment-btn" onclick="window.open('/docs', '_blank')">
+                    📖 Swagger API
+                </button>
+                <button class="gh-segment-btn" onclick="window.islApp.exportTinyML()">
+                    ⚡ Export TinyML C++
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- GitHub Underline Subnavigation Tabs -->
+    <div class="gh-subnav-wrapper">
+        <nav class="gh-underline-nav">
+            <a class="gh-nav-item active" data-tab="dashboard">
+                <span class="gh-nav-icon">📊</span> Dashboard
+            </a>
+            <a class="gh-nav-item" data-tab="live">
+                <span class="gh-nav-icon">⚡</span> Live Translation
+            </a>
+            <a class="gh-nav-item" data-tab="collection">
+                <span class="gh-nav-icon">📁</span> Dataset Collection
+                <span class="gh-counter-badge" id="navDatasetCount">10k</span>
+            </a>
+            <a class="gh-nav-item" data-tab="calibration">
+                <span class="gh-nav-icon">🎯</span> Calibration
+            </a>
+            <a class="gh-nav-item" data-tab="training">
+                <span class="gh-nav-icon">🧠</span> Model Training
+            </a>
+            <a class="gh-nav-item" data-tab="evaluation">
+                <span class="gh-nav-icon">📈</span> Model Evaluation
+                <span class="gh-counter-badge" id="navEvalF1">100%</span>
+            </a>
+            <a class="gh-nav-item" data-tab="vocabulary">
+                <span class="gh-nav-icon">📖</span> ISL Vocabulary
+                <span class="gh-counter-badge">20</span>
+            </a>
+            <a class="gh-nav-item" data-tab="history">
+                <span class="gh-nav-icon">📜</span> Translation History
+            </a>
+            <a class="gh-nav-item" data-tab="settings">
+                <span class="gh-nav-icon">⚙️</span> Settings
+            </a>
+        </nav>
+    </div>
+
+    <!-- Main Container Layout -->
+    <main class="gh-main-container">
+
+        <!-- ==========================================
+             TAB 1: DASHBOARD
+             ========================================== -->
+        <section id="tab-dashboard" class="tab-content active">
+            <!-- Sentence Builder Bar (GitHub Commit Banner Style) -->
+            <div class="gh-sentence-bar">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span class="Label Label--purple">Constructed Phrase</span>
+                    <div id="currentSentenceText" class="gh-sentence-text">Hello Welcome</div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button id="btnSpeakSentence" class="btn btn-sm btn-primary">🔊 Speak Phrase</button>
+                    <button id="btnClearSentence" class="btn btn-sm">Clear</button>
+                </div>
+            </div>
+
+            <div class="grid-dashboard">
+                <!-- Left Panel: 3D Hand Posture & Sensor Telemetry -->
+                <div class="Box">
+                    <div class="Box-header">
+                        <div class="Box-title">
+                            <span>✋</span> Real-Time Hand Skeletal Kinematics & Flexion
+                        </div>
+                        <span class="Label Label--accent">50 Hz Stream</span>
+                    </div>
+
+                    <div class="Box-body">
+                        <!-- Canvas Visualizer -->
+                        <div class="visualizer-container">
+                            <canvas id="handCanvas"></canvas>
+                            <div class="visualizer-legend">
+                                <span>🔵 Straight (&lt;25%)</span>
+                                <span>🟢 Mid (25-55%)</span>
+                                <span>🟡 High (55-80%)</span>
+                                <span>🔴 Fist (&gt;80%)</span>
+                            </div>
+                        </div>
+
+                        <!-- 5 Flex Finger Vertical Gauges -->
+                        <div class="telemetry-grid">
+                            <div class="flex-gauge-item">
+                                <div class="flex-gauge-name">Thumb</div>
+                                <div class="flex-bar-vertical">
+                                    <div id="flex-thumb-fill" class="flex-bar-vertical-fill"></div>
+                                </div>
+                                <div id="flex-thumb-val" class="flex-gauge-val">0%</div>
+                            </div>
+                            <div class="flex-gauge-item">
+                                <div class="flex-gauge-name">Index</div>
+                                <div class="flex-bar-vertical">
+                                    <div id="flex-index-fill" class="flex-bar-vertical-fill"></div>
+                                </div>
+                                <div id="flex-index-val" class="flex-gauge-val">0%</div>
+                            </div>
+                            <div class="flex-gauge-item">
+                                <div class="flex-gauge-name">Middle</div>
+                                <div class="flex-bar-vertical">
+                                    <div id="flex-middle-fill" class="flex-bar-vertical-fill"></div>
+                                </div>
+                                <div id="flex-middle-val" class="flex-gauge-val">0%</div>
+                            </div>
+                            <div class="flex-gauge-item">
+                                <div class="flex-gauge-name">Ring</div>
+                                <div class="flex-bar-vertical">
+                                    <div id="flex-ring-fill" class="flex-bar-vertical-fill"></div>
+                                </div>
+                                <div id="flex-ring-val" class="flex-gauge-val">0%</div>
+                            </div>
+                            <div class="flex-gauge-item">
+                                <div class="flex-gauge-name">Little</div>
+                                <div class="flex-bar-vertical">
+                                    <div id="flex-little-fill" class="flex-bar-vertical-fill"></div>
+                                </div>
+                                <div id="flex-little-val" class="flex-gauge-val">0%</div>
+                            </div>
+                        </div>
+
+                        <!-- MPU6050 Coordinate Boxes -->
+                        <div class="imu-telemetry-row">
+                            <div class="imu-box">
+                                <h4><span>Accelerometer (g)</span><span>MPU6050</span></h4>
+                                <div class="axis-val-row"><span>acc_x:</span><span id="val-acc-x">0.00</span></div>
+                                <div class="axis-val-row"><span>acc_y:</span><span id="val-acc-y">0.98</span></div>
+                                <div class="axis-val-row"><span>acc_z:</span><span id="val-acc-z">0.15</span></div>
+                            </div>
+                            <div class="imu-box">
+                                <h4><span>Gyroscope (rad/s)</span><span>MPU6050</span></h4>
+                                <div class="axis-val-row"><span>gyro_x:</span><span id="val-gyro-x">0.00</span></div>
+                                <div class="axis-val-row"><span>gyro_y:</span><span id="val-gyro-y">0.00</span></div>
+                                <div class="axis-val-row"><span>gyro_z:</span><span id="val-gyro-z">0.00</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Panel: Recognition Hero Card & Simulator Controls -->
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <!-- Hero Recognition Card -->
+                    <div class="gh-prediction-hero">
+                        <div class="gh-hero-sublabel">Recognized ISL Gesture</div>
+                        <div id="dashPredictedGesture" class="gh-hero-gesture">HELLO</div>
+                        <div id="dashHindiGesture" class="gh-hero-hindi">नमस्ते</div>
+
+                        <div class="gh-progress-bar">
+                            <div id="dashConfidenceFill" class="gh-progress-fill" style="width: 95%;"></div>
+                        </div>
+                        <div class="gh-progress-meta">
+                            <span>Model Probability</span>
+                            <strong id="dashConfidencePct" style="color:var(--color-success-fg);">95.0%</strong>
+                        </div>
+
+                        <div style="margin-bottom: 12px;">
+                            <span class="Label Label--accent" id="dashModelBadge">Model: SVM (Empirically Validated)</span>
+                        </div>
+
+                        <div>
+                            <span style="font-size: 11px; color:var(--color-fg-muted); font-family:var(--font-mono);">Top-3 Candidates:</span>
+                            <div id="dashTopKPills" class="prediction-top-k"></div>
+                        </div>
+                    </div>
+
+                    <!-- Simulator Trigger Card -->
+                    <div class="Box">
+                        <div class="Box-header">
+                            <div class="Box-title">
+                                <span>🧪</span> Biomechanical Sensor Simulator
+                            </div>
+                            <span class="Label Label--attention">Dev Mode</span>
+                        </div>
+                        <div class="Box-body">
+                            <div class="form-group">
+                                <label class="form-label">Simulate ISL Gesture Live:</label>
+                                <select id="simGestureSelect" class="form-select"></select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Simulate User Anatomical Profile:</label>
+                                <select id="simUserSelect" class="form-select">
+                                    <option value="U01">User U01 (Baseline Profile)</option>
+                                    <option value="U02">User U02 (High Flexibility)</option>
+                                    <option value="U03">User U03 (Tremor Bias)</option>
+                                    <option value="U04">User U04 (Tight Grip)</option>
+                                    <option value="U05">User U05 (Held-Out Test Subject)</option>
+                                </select>
+                            </div>
+                            <p style="font-size: 12px; color:var(--color-fg-muted); line-height: 1.4;">
+                                Select any gesture or user to test live feature streaming, 3D kinematics, and classifier debouncing in real time.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             TAB 2: LIVE TRANSLATION KIOSK
+             ========================================== -->
+        <section id="tab-live" class="tab-content">
+            <div class="gh-prediction-hero" style="padding: 48px 24px; margin-bottom: 20px;">
+                <div class="gh-hero-sublabel">Live Sign Language Translation Stream</div>
+                <div id="livePredictedGesture" class="gh-hero-gesture" style="font-size: 56px;">HELLO</div>
+                <div id="liveHindiGesture" class="gh-hero-hindi" style="font-size: 32px; margin-bottom: 20px;">नमस्ते</div>
+                <span class="Label Label--success" id="liveConfidencePct" style="font-size: 14px; padding: 4px 16px;">98.4% Confidence</span>
+            </div>
+
+            <div class="grid-2">
+                <div class="Box">
+                    <div class="Box-header">
+                        <div class="Box-title"><span>🗣️</span> Multilingual Speech Settings</div>
+                    </div>
+                    <div class="Box-body">
+                        <div class="form-group">
+                            <label class="form-label">Speech Output Language:</label>
+                            <select id="ttsLangSelect" class="form-select">
+                                <option value="en">English (e.g. "Hello", "Thank You")</option>
+                                <option value="hi">Hindi / हिंदी (e.g. "नमस्ते", "धन्यवाद")</option>
+                            </select>
+                        </div>
+                        <p style="font-size: 12px; color: var(--color-fg-muted);">
+                            Natural speech synthesis occurs automatically upon stable gesture recognition exceeding confidence thresholds.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="Box">
+                    <div class="Box-header">
+                        <div class="Box-title"><span>💬</span> Active Conversation Buffer</div>
+                    </div>
+                    <div class="Box-body">
+                        <p style="font-size: 12px; color: var(--color-fg-muted); margin-bottom: 12px;">
+                            Recognized signs are concatenated into natural conversational phrases.
+                        </p>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-sm btn-primary" onclick="window.islApp.speakSentence()">🔊 Speak Current Phrase</button>
+                            <button class="btn btn-sm" onclick="window.islApp.clearSentence()">Clear Phrase</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             TAB 3: DATASET COLLECTION
+             ========================================== -->
+        <section id="tab-collection" class="tab-content">
+            <div class="grid-4">
+                <div class="stat-box">
+                    <div class="stat-box-title">Total Samples</div>
+                    <div id="statTotalSamples" class="stat-box-num" style="color:var(--color-accent-fg);">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-box-title">Real Hardware Samples</div>
+                    <div id="statRealSamples" class="stat-box-num" style="color:var(--color-success-fg);">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-box-title">Simulated Samples</div>
+                    <div id="statSimSamples" class="stat-box-num" style="color:var(--color-purple-fg);">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-box-title">Distinct User Subjects</div>
+                    <div id="statUserCount" class="stat-box-num" style="color:var(--color-attention-fg);">0</div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <!-- Recording Form -->
+                <div class="Box">
+                    <div class="Box-header">
+                        <div class="Box-title"><span>⏺️</span> Record Gesture Session</div>
+                        <span id="recordingStatusBadge" class="recording-badge" style="display:none;">
+                            <span class="pulse-circle"></span> RECORDING (<span id="recordCountdown">5s</span>)
+                        </span>
+                    </div>
+                    <div class="Box-body">
+                        <div class="form-group">
+                            <label class="form-label">User Subject ID:</label>
+                            <select id="recordUserSelect" class="form-select">
+                                <option value="U01">U01 (Subject 1)</option>
+                                <option value="U02">U02 (Subject 2)</option>
+                                <option value="U03">U03 (Subject 3)</option>
+                                <option value="U04">U04 (Subject 4)</option>
+                                <option value="U05">U05 (Subject 5 - Held-Out Test)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Gesture to Record:</label>
+                            <select id="recordGestureSelect" class="form-select"></select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Session Duration:</label>
+                            <select id="recordDurationSelect" class="form-select">
+                                <option value="3">3 Seconds (~150 samples)</option>
+                                <option value="5" selected>5 Seconds (~250 samples)</option>
+                                <option value="10">10 Seconds (~500 samples)</option>
+                            </select>
+                        </div>
+
+                        <div style="display: flex; gap: 8px; margin-top: 16px;">
+                            <button id="btnStartRecord" class="btn btn-danger" style="flex:1;">⏺️ Start Recording</button>
+                            <button id="btnStopRecord" class="btn">Stop</button>
+                        </div>
+
+                        <div style="margin-top: 12px; font-size: 12px; color:var(--color-fg-muted); font-family:var(--font-mono);">
+                            Samples captured in current session: <strong id="recordSampleCounter" style="color:var(--color-fg-default);">0</strong>
+                        </div>
+
+                        <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--color-border-muted);">
+                            <button id="btnGenerateSimDataset" class="btn btn-primary" style="width:100%;">
+                                ⚡ Generate Multi-User Baseline Dataset (10,000 Samples)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dataset Distribution Breakdown -->
+                <div class="Box">
+                    <div class="Box-header">
+                        <div class="Box-title"><span>📊</span> Dataset Class Distribution</div>
+                        <button class="btn btn-sm" onclick="window.islApp.loadDatasetStats()">🔄 Refresh</button>
+                    </div>
+                    <div class="data-table-container" style="max-height: 380px; border:none;">
+                        <table class="cyber-table">
+                            <thead>
+                                <tr><th>Gesture</th><th>Sample Count</th><th>Distribution</th></tr>
+                            </thead>
+                            <tbody id="datasetDistributionBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             TAB 4: CALIBRATION
+             ========================================== -->
+        <section id="tab-calibration" class="tab-content">
+            <div class="Box">
+                <div class="Box-header">
+                    <div class="Box-title"><span>🎯</span> 3-Step Wearable Glove Calibration Wizard</div>
+                    <span class="Label Label--accent">Per-User Normalization</span>
+                </div>
+                <div class="Box-body">
+                    <p style="font-size: 13px; color: var(--color-fg-muted); margin-bottom: 16px;">
+                        Flex sensors experience physical resistance drift and variations in hand anatomy.
+                        Record the 3 key baseline positions to calibrate and normalize readings into standard [0.0, 1.0] deflection ranges.
+                    </p>
+
+                    <div class="form-group" style="max-width: 280px; margin-bottom: 20px;">
+                        <label class="form-label">Select User for Calibration:</label>
+                        <select id="calibUserSelect" class="form-select">
+                            <option value="U01">User U01</option>
+                            <option value="U02">User U02</option>
+                            <option value="U03">User U03</option>
+                            <option value="U04">User U04</option>
+                            <option value="U05">User U05</option>
+                        </select>
+                    </div>
+
+                    <div class="grid-3">
+                        <div class="Box" style="margin-bottom: 0;">
+                            <div class="Box-header"><strong>1. Relaxed Hand</strong></div>
+                            <div class="Box-body">
+                                <p style="font-size: 12px; color: var(--color-fg-muted); margin-bottom: 12px;">
+                                    Rest hand naturally without force. Calibrates neutral resting flex and gyro zero-rate bias.
+                                </p>
+                                <button id="btnCalibRelaxed" class="btn btn-sm btn-primary" style="width:100%;">Record Relaxed (3s)</button>
+                            </div>
+                        </div>
+
+                        <div class="Box" style="margin-bottom: 0;">
+                            <div class="Box-header"><strong>2. Fingers Straight</strong></div>
+                            <div class="Box-body">
+                                <p style="font-size: 12px; color: var(--color-fg-muted); margin-bottom: 12px;">
+                                    Extend all 5 fingers fully flat. Calibrates minimum bending (0.0 limit).
+                                </p>
+                                <button id="btnCalibStraight" class="btn btn-sm btn-primary" style="width:100%;">Record Straight (3s)</button>
+                            </div>
+                        </div>
+
+                        <div class="Box" style="margin-bottom: 0;">
+                            <div class="Box-header"><strong>3. Fingers Bent (Fist)</strong></div>
+                            <div class="Box-body">
+                                <p style="font-size: 12px; color: var(--color-fg-muted); margin-bottom: 12px;">
+                                    Close hand tightly into a fist. Calibrates maximum bending (1.0 limit).
+                                </p>
+                                <button id="btnCalibBent" class="btn btn-sm btn-primary" style="width:100%;">Record Bent (3s)</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 20px; text-align: center;">
+                        <button id="btnSaveCalibration" class="btn btn-primary" style="padding: 6px 24px;">
+                            💾 Compute & Save Calibration Profile
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             TAB 5: MODEL TRAINING
+             ========================================== -->
+        <section id="tab-training" class="tab-content">
+            <div class="grid-2">
+                <div class="Box">
+                    <div class="Box-header">
+                        <div class="Box-title"><span>🧠</span> Baseline Machine Learning Training</div>
+                        <span class="Label Label--accent">Scikit-Learn</span>
+                    </div>
+                    <div class="Box-body">
+                        <p style="font-size: 13px; color: var(--color-fg-muted); margin-bottom: 14px;">
+                            Trains and evaluates 3 core machine learning algorithms across the 11 sensor features:
+                        </p>
+                        <ul style="font-size: 12px; color: var(--color-fg-muted); margin-left: 20px; margin-bottom: 16px; line-height: 1.6;">
+                            <li><strong>Decision Tree</strong>: Fast, explainable rule splits based on finger flexion thresholds.</li>
+                            <li><strong>Random Forest</strong>: Robust ensemble of decision trees with high generalization.</li>
+                            <li><strong>Support Vector Machine (SVM)</strong>: RBF non-linear kernel hyperplane classifier.</li>
+                        </ul>
+
+                        <div class="form-group">
+                            <label class="form-label">Data Splitting Strategy:</label>
+                            <select id="trainEvalModeSelect" class="form-select">
+                                <option value="user_independent">User-Independent Split (Train: U01-U04, Test: U05)</option>
+                                <option value="stratified">Stratified 80/20 Random Split</option>
+                            </select>
+                        </div>
+
+                        <button id="btnTrainBaseline" class="btn btn-primary" style="width:100%;">
+                            🚀 Train & Compare Models (DT, RF, SVM)
+                        </button>
+                    </div>
+                </div>
+
+                <div class="Box">
+                    <div class="Box-header">
+                        <div class="Box-title"><span>⚡</span> Advanced Dynamic Model (LSTM)</div>
+                        <span class="Label Label--purple">PyTorch Time-Series</span>
+                    </div>
+                    <div class="Box-body">
+                        <p style="font-size: 13px; color: var(--color-fg-muted); margin-bottom: 14px;">
+                            Dynamic ISL gestures (like HELLO waving, YES nodding, EMERGENCY shaking) exhibit continuous trajectory dynamics.
+                            Trains a multi-layer Long Short-Term Memory (LSTM) network over 30-step sliding windows.
+                        </p>
+                        <button id="btnTrainLSTM" class="btn" style="width:100%; margin-top: 36px;">
+                            ⚡ Train Advanced Time-Series LSTM
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             TAB 6: MODEL EVALUATION
+             ========================================== -->
+        <section id="tab-evaluation" class="tab-content">
+            <!-- Model Comparison Summary Table -->
+            <div class="Box">
+                <div class="Box-header">
+                    <div class="Box-title"><span>🏆</span> Empirical ML Model Evaluation Summary</div>
+                    <button class="btn btn-sm" onclick="window.islApp.loadEvaluationReport()">🔄 Refresh Metrics</button>
+                </div>
+                <div class="data-table-container" style="border:none;">
+                    <table class="cyber-table">
+                        <thead>
+                            <tr>
+                                <th>Model Name</th>
+                                <th>Accuracy</th>
+                                <th>Precision (Weighted)</th>
+                                <th>Recall (Weighted)</th>
+                                <th>F1-Score (Weighted)</th>
+                                <th>Training Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modelComparisonTableBody">
+                            <tr><td colspan="6" style="text-align:center; color:var(--color-fg-muted);">No evaluation data available. Click 'Train & Compare Models' in the Model Training tab.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <!-- Confusion Matrix Heatmap -->
+                <div class="Box">
+                    <div class="Box-header">
+                        <div class="Box-title"><span>🎯</span> Normalized Confusion Matrix</div>
+                        <span class="Label Label--accent">Contribution Graph Style</span>
+                    </div>
+                    <div class="Box-body">
+                        <p style="font-size: 12px; color: var(--color-fg-muted); margin-bottom: 10px;">
+                            Diagonal cells show True Positive classification rates across the 20 vocabulary classes.
+                        </p>
+                        <div id="cmHeatmapContainer" class="cm-container"></div>
+                    </div>
+                </div>
+
+                <!-- Per-Class Metrics -->
+                <div class="Box">
+                    <div class="Box-header">
+                        <div class="Box-title"><span>📋</span> Per-Gesture Classification Report</div>
+                    </div>
+                    <div id="perClassReportContainer" class="data-table-container" style="max-height: 480px; border:none;"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             TAB 7: ISL VOCABULARY
+             ========================================== -->
+        <section id="tab-vocabulary" class="tab-content">
+            <div class="Box" style="margin-bottom: 16px;">
+                <div class="Box-header">
+                    <div class="Box-title"><span>📖</span> Predefined Indian Sign Language (ISL) Vocabulary (20 Gestures)</div>
+                </div>
+                <div class="Box-body">
+                    <p style="font-size: 13px; color: var(--color-fg-muted);">
+                        Click on any gesture card below to instantly preview its sensor profile and set the active simulator gesture.
+                    </p>
+                </div>
+            </div>
+            <div id="gesturesVocabularyGrid" class="grid-3"></div>
+        </section>
+
+        <!-- ==========================================
+             TAB 8: TRANSLATION HISTORY
+             ========================================== -->
+        <section id="tab-history" class="tab-content">
+            <div class="Box">
+                <div class="Box-header">
+                    <div class="Box-title"><span>📜</span> Real-Time Translation History Log</div>
+                </div>
+                <div class="data-table-container" style="max-height: 500px; border:none;">
+                    <table class="cyber-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>English Sign</th>
+                                <th>Hindi Translation</th>
+                                <th>Confidence</th>
+                                <th>Audio Replay</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody">
+                            <tr><td colspan="5" style="text-align:center; color:var(--color-fg-muted);">No gestures translated yet. Enable streaming or simulator to start translating.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             TAB 9: SETTINGS & HARDWARE
+             ========================================== -->
+        <section id="tab-settings" class="tab-content">
+            <div class="grid-2">
+                <div class="Box">
+                    <div class="Box-header">
+                        <div class="Box-title"><span>🔌</span> ESP32 Bluetooth & Serial Hardware Setup</div>
+                    </div>
+                    <div class="Box-body">
+                        <div class="form-group">
+                            <label class="form-label">Available COM / Bluetooth Ports:</label>
+                            <div style="display: flex; gap: 8px;">
+                                <select id="serialPortSelect" class="form-select" style="flex:1;"></select>
+                                <button id="btnRefreshPorts" class="btn btn-sm">🔄 Refresh</button>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 14px;">
+                            <button id="btnConnectSerial" class="btn btn-primary">Connect to Glove Hardware</button>
+                        </div>
+
+                        <div style="margin-top: 18px; font-size: 12px; color: var(--color-fg-muted); line-height: 1.5;">
+                            <strong>ESP32 Bluetooth Connection Guide:</strong><br>
+                            1. Pair your computer with <code>ISL-Glove-ESP32</code> in Windows Bluetooth Settings.<br>
+                            2. An Outgoing Standard Serial Over Bluetooth COM port (e.g. COM4) will be created.<br>
+                            3. Select that COM port above and click Connect.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="Box">
+                    <div class="Box-header">
+                        <div class="Box-title"><span>⚡</span> TinyML C++ On-Device Inference</div>
+                        <span class="Label Label--success">ESP32 Offline</span>
+                    </div>
+                    <div class="Box-body">
+                        <p style="font-size: 12px; color: var(--color-fg-muted); margin-bottom: 14px;">
+                            Convert trained Scikit-Learn models into zero-dependency C++ code (< 1ms execution, 0 dynamic RAM) to run directly inside the ESP32 firmware without a PC.
+                        </p>
+                        <button class="btn btn-primary" onclick="window.islApp.exportTinyML()" style="width: 100%;">
+                            ⚡ Export Trained Model to ESP32 C++ (TinyML)
+                        </button>
+                        <div id="tinymlExportResult" style="margin-top: 12px; font-size: 12px; font-family: var(--font-mono); color: var(--color-success-fg);"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script src="/static/js/visualizer.js"></script>
+    <script src="/static/js/charts.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

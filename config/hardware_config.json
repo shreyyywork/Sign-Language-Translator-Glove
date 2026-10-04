@@ -1,0 +1,33 @@
+{
+  "device_name": "ISL-Glove-ESP32",
+  "baud_rate": 115200,
+  "sampling_rate_hz": 50,
+  "adc": {
+    "resolution_bits": 12,
+    "max_value": 4095,
+    "voltage_ref": 3.3,
+    "smoothing_samples": 8
+  },
+  "pins": {
+    "flex_thumb": 34,
+    "flex_index": 35,
+    "flex_middle": 32,
+    "flex_ring": 33,
+    "flex_little": 39,
+    "i2c_sda": 21,
+    "i2c_scl": 22,
+    "status_led": 2,
+    "calibrate_button": 0
+  },
+  "i2c_addresses": {
+    "mpu6050": "0x68",
+    "oled_display": "0x3C"
+  },
+  "protocol": {
+    "header": "$ISL",
+    "separator": ",",
+    "footer": "*",
+    "checksum_enabled": true,
+    "packet_format": "$ISL,thumb,index,middle,ring,little,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z*CHECKSUM\\n"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "user_id": "DEFAULT",
+  "timestamp": "initial",
+  "flex": {
+    "thumb": {
+      "straight": 1200.0,
+      "relaxed": 1800.0,
+      "bent": 3100.0
+    },
+    "index": {
+      "straight": 1150.0,
+      "relaxed": 1750.0,
+      "bent": 3200.0
+    },
+    "middle": {
+      "straight": 1100.0,
+      "relaxed": 1700.0,
+      "bent": 3250.0
+    },
+    "ring": {
+      "straight": 1150.0,
+      "relaxed": 1750.0,
+      "bent": 3150.0
+    },
+    "little": {
+      "straight": 1250.0,
+      "relaxed": 1850.0,
+      "bent": 3050.0
+    }
+  },
+  "imu": {
+    "acc_offset": {
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0
+    },
+    "gyro_offset": {
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0
+    }
+  }
+}
