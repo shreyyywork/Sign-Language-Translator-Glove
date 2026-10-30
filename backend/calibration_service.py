@@ -100,9 +100,10 @@ class CalibrationService:
             r_mean = float(np.mean(relaxed_vals)) if relaxed_vals else 1800.0
             b_mean = float(np.mean(bent_vals)) if bent_vals else 3200.0
 
-            # Safeguard: ensure bent > straight
-            if b_mean <= s_mean:
-                b_mean = s_mean + 1500.0
+            # Safeguard: ensure bent > straight with adequate physical span
+            min_span = 100.0
+            if (b_mean - s_mean) < min_span:
+                b_mean = s_mean + max(abs(s_mean) * 0.4, 200.0)
 
             flex_calib[finger] = {
                 "straight": round(s_mean, 2),
@@ -156,7 +157,9 @@ class CalibrationService:
             if finger in flex_calib:
                 s = flex_calib[finger].get("straight", 1200.0)
                 b = flex_calib[finger].get("bent", 3200.0)
-                span = b - s if (b - s) != 0 else 1.0
+                span = b - s
+                if abs(span) < 50.0:
+                    span = 250.0 if span >= 0 else -250.0
                 norm_val = (raw_val - s) / span
                 normalized[finger] = round(float(np.clip(norm_val, 0.0, 1.0)), 4)
             else:

@@ -8,6 +8,16 @@ Provides:
 """
 
 import os
+import sys
+from pathlib import Path
+
+# Add project root directory to sys.path
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+import sitecustomize  # noqa: F401 - Windows Code Integrity compatibility shim
+
 import json
 import time
 import asyncio
@@ -60,6 +70,16 @@ system_state = {
 async def lifespan(app: FastAPI):
     # Try loading existing trained model on startup
     prediction_service.reload_model()
+    # Attempt auto-connection if ESP32 USB board is already plugged in
+    try:
+        candidate_port = SerialBluetoothManager.auto_detect_esp32_usb()
+        if candidate_port:
+            print(f"[STARTUP] Detected ESP32 candidate port on {candidate_port}. Auto-connecting...")
+            if serial_manager.connect(port_name=candidate_port, baud_rate=115200, connection_type="usb"):
+                system_state["mode"] = "hardware"
+                print(f"[STARTUP] ESP32 auto-connected successfully on {candidate_port}! Hardware mode active.")
+    except Exception as e:
+        print(f"[STARTUP] Auto-connect check skipped: {e}")
     yield
     # Cleanup on shutdown
     serial_manager.disconnect()
@@ -118,6 +138,14 @@ class PredictRequest(BaseModel):
 
 class ModelSelectRequest(BaseModel):
     model_name: str
+
+class SerialConnectRequest(BaseModel):
+    port: str
+    baud_rate: Optional[int] = 115200
+    connection_type: Optional[str] = "auto"
+
+class EspCommModeRequest(BaseModel):
+    mode: str = Field(..., description="'usb', 'bluetooth', or 'dual'")
 
 
 # ==========================================
@@ -190,21 +218,76 @@ async def generate_simulated_dataset(
         raise HTTPException(status_code=500, detail=str(e))
 
 # ==========================================
-# Serial / Bluetooth Endpoints
+# Serial / USB / Bluetooth COM Port Endpoints
 # ==========================================
 @app.get("/api/serial/ports")
 async def list_ports():
-    """List available USB serial and Bluetooth COM ports."""
-    return {"ports": SerialBluetoothManager.list_available_ports()}
+    """List available USB serial and Bluetooth COM ports categorized by connection type."""
+    data = SerialBluetoothManager.list_categorized_ports()
+    data["active_status"] = serial_manager.get_status()
+    return data
 
 @app.post("/api/serial/connect")
-async def connect_serial(port: str = Query(...)):
-    """Connect to a specific serial/Bluetooth COM port."""
-    success = serial_manager.connect(port)
+async def connect_serial(
+    port: Optional[str] = Query(None),
+    baud_rate: Optional[int] = Query(115200),
+    connection_type: Optional[str] = Query("auto"),
+    req: Optional[SerialConnectRequest] = None
+):
+    """
+    Connect to a specific USB Serial Port or Bluetooth COM Port.
+    Supports either JSON body or query parameters for maximum flexibility.
+    """
+    target_port = (req.port if req else None) or port
+    target_baud = (req.baud_rate if (req and req.baud_rate) else baud_rate) or 115200
+    target_type = (req.connection_type if (req and req.connection_type) else connection_type) or "auto"
+
+    if not target_port or target_port == "none":
+        raise HTTPException(status_code=400, detail="A valid COM port or USB port is required.")
+
+    success = serial_manager.connect(
+        port_name=target_port,
+        baud_rate=target_baud,
+        connection_type=target_type
+    )
     if success:
         system_state["mode"] = "hardware"
-        return {"status": "connected", "port": port}
-    raise HTTPException(status_code=500, detail=f"Failed to connect to {port}")
+        return {
+            "status": "connected",
+            "port": target_port,
+            "baud_rate": target_baud,
+            "connection_type": serial_manager.connection_type,
+            "hardware_status": serial_manager.get_status()
+        }
+    err_detail = serial_manager.last_error or f"Failed to connect to {target_port} at {target_baud} baud."
+    raise HTTPException(status_code=409 if "Access denied" in err_detail else 500, detail=err_detail)
+
+@app.post("/api/serial/auto_connect")
+async def auto_connect_usb():
+    """Auto-detect candidate ESP32 USB port and connect in 1 click."""
+    recommended_port = SerialBluetoothManager.auto_detect_esp32_usb()
+    if not recommended_port:
+        raise HTTPException(
+            status_code=404,
+            detail="No candidate ESP32 USB port detected. Please plug in the USB cable or select a COM port manually."
+        )
+
+    success = serial_manager.connect(
+        port_name=recommended_port,
+        baud_rate=115200,
+        connection_type="usb"
+    )
+    if success:
+        system_state["mode"] = "hardware"
+        return {
+            "status": "connected",
+            "port": recommended_port,
+            "baud_rate": 115200,
+            "connection_type": "usb",
+            "hardware_status": serial_manager.get_status()
+        }
+    err_detail = serial_manager.last_error or f"Failed to connect to detected USB port {recommended_port}."
+    raise HTTPException(status_code=409 if "Access denied" in err_detail else 500, detail=err_detail)
 
 @app.post("/api/serial/disconnect")
 async def disconnect_serial():
@@ -212,6 +295,21 @@ async def disconnect_serial():
     serial_manager.disconnect()
     system_state["mode"] = "simulated"
     return {"status": "disconnected", "mode": "simulated"}
+
+@app.get("/api/serial/status")
+async def get_serial_status():
+    """Get active hardware connection telemetry, packet counters, and baud rate."""
+    return serial_manager.get_status()
+
+@app.post("/api/serial/set_comm_mode")
+async def set_esp_comm_mode(req: EspCommModeRequest):
+    """Switch ESP32 communication mode (usb, bluetooth, or dual)."""
+    if not serial_manager.is_connected:
+        raise HTTPException(status_code=400, detail="Hardware glove is not connected. Connect via USB or COM port first.")
+    success = serial_manager.set_esp_comm_mode(req.mode)
+    if success:
+        return {"message": f"Switched ESP32 communication mode to {req.mode}", "mode": req.mode}
+    raise HTTPException(status_code=400, detail=f"Invalid mode: {req.mode}. Use 'usb', 'bluetooth', or 'dual'.")
 
 # ==========================================
 # Dataset Management Endpoints
@@ -416,11 +514,28 @@ async def websocket_stream(websocket: WebSocket):
                 if latest:
                     sample = latest
                 else:
-                    sample = simulator.generate_sample(
-                        gesture_id=system_state["active_sim_gesture"],
-                        user_id=system_state["active_sim_user"],
-                        step_index=step
-                    )
+                    # In hardware mode, do not silently fallback to simulator.
+                    # Send explicit waiting status so user is accurately informed.
+                    waiting_payload = {
+                        "type": "sensor_frame",
+                        "timestamp": round(time.time(), 3),
+                        "mode": "hardware",
+                        "connection_type": serial_manager.connection_type,
+                        "hardware_port": serial_manager.port,
+                        "is_waiting_hardware": True,
+                        "packets_received": serial_manager.packets_received,
+                        "raw_sample": None,
+                        "prediction": {
+                            "gesture": "CONNECTING...",
+                            "confidence": 0.0,
+                            "top_k": [],
+                            "calibrated_features": {"thumb": 0, "index": 0, "middle": 0, "ring": 0, "little": 0, "acc_x": 0, "acc_y": 0, "acc_z": 0, "gyro_x": 0, "gyro_y": 0, "gyro_z": 0}
+                        },
+                        "is_recording": system_state["is_recording"]
+                    }
+                    await websocket.send_text(json.dumps(waiting_payload))
+                    await asyncio.sleep(0.04)
+                    continue
             else:
                 sample = simulator.generate_sample(
                     gesture_id=system_state["active_sim_gesture"],
@@ -446,6 +561,8 @@ async def websocket_stream(websocket: WebSocket):
                 "type": "sensor_frame",
                 "timestamp": sample["timestamp"],
                 "mode": system_state["mode"],
+                "connection_type": serial_manager.connection_type if system_state["mode"] == "hardware" else "simulated",
+                "hardware_port": serial_manager.port if system_state["mode"] == "hardware" else None,
                 "raw_sample": sample,
                 "prediction": pred_result,
                 "is_recording": system_state["is_recording"]
@@ -463,7 +580,7 @@ async def websocket_stream(websocket: WebSocket):
 # ==========================================
 # Static Files & UI Serving
 # ==========================================
-frontend_dir = os.path.abspath("frontend")
+frontend_dir = os.path.join(ROOT_DIR, "frontend")
 if os.path.exists(frontend_dir):
     app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
 
@@ -477,4 +594,4 @@ async def serve_index():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, reload=True, app_dir=str(ROOT_DIR))

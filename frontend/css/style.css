@@ -844,3 +844,136 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* =========================================================
+   Hardware Connection Manager (USB Port & COM Port UI)
+   ========================================================= */
+.conn-tabs {
+  display: flex;
+  gap: 6px;
+  background: var(--color-canvas-inset);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-default);
+  margin-bottom: 16px;
+}
+
+.conn-tab-btn {
+  flex: 1;
+  padding: 8px 12px;
+  background: transparent;
+  color: var(--color-fg-muted);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.conn-tab-btn:hover {
+  color: var(--color-fg-default);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.conn-tab-btn.active {
+  background: var(--color-canvas-subtle);
+  color: var(--color-accent-fg);
+  font-weight: 600;
+  border: 1px solid var(--color-border-default);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.conn-panel {
+  display: none;
+  animation: fadeIn 0.2s ease;
+}
+
+.conn-panel.active {
+  display: block;
+}
+
+.conn-header-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: var(--color-canvas-inset);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--color-fg-muted);
+  margin-bottom: 12px;
+}
+
+.conn-chip-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-fg);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+.conn-telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.conn-telemetry-item {
+  background: var(--color-canvas-inset);
+  border: 1px solid var(--color-border-muted);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  text-align: center;
+}
+
+.conn-telemetry-label {
+  font-size: 10px;
+  color: var(--color-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.conn-telemetry-val {
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--color-fg-default);
+}
+
+.btn-usb-auto {
+  background: linear-gradient(180deg, #238636 0%, #1c6d2c 100%);
+  color: #ffffff;
+  border: 1px solid rgba(240, 246, 252, 0.1);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.btn-usb-auto:hover {
+  background: linear-gradient(180deg, #2ea043 0%, #238636 100%);
+}
+
+.highlight-pulse {
+  animation: pulse-border 1.5s infinite;
+}
+
+@keyframes pulse-border {
+  0% { box-shadow: 0 0 0 0 rgba(88, 166, 255, 0.4); }
+  70% { box-shadow: 0 0 0 8px rgba(88, 166, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(88, 166, 255, 0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+

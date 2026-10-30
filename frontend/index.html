@@ -141,6 +141,7 @@
                                     <div id="flex-thumb-fill" class="flex-bar-vertical-fill"></div>
                                 </div>
                                 <div id="flex-thumb-val" class="flex-gauge-val">0%</div>
+                                <div id="flex-thumb-raw" class="flex-gauge-raw" style="font-size:10px; color:var(--color-fg-muted); margin-top:3px; font-family:var(--font-mono);">ADC: --</div>
                             </div>
                             <div class="flex-gauge-item">
                                 <div class="flex-gauge-name">Index</div>
@@ -148,6 +149,7 @@
                                     <div id="flex-index-fill" class="flex-bar-vertical-fill"></div>
                                 </div>
                                 <div id="flex-index-val" class="flex-gauge-val">0%</div>
+                                <div id="flex-index-raw" class="flex-gauge-raw" style="font-size:10px; color:var(--color-fg-muted); margin-top:3px; font-family:var(--font-mono);">ADC: --</div>
                             </div>
                             <div class="flex-gauge-item">
                                 <div class="flex-gauge-name">Middle</div>
@@ -155,6 +157,7 @@
                                     <div id="flex-middle-fill" class="flex-bar-vertical-fill"></div>
                                 </div>
                                 <div id="flex-middle-val" class="flex-gauge-val">0%</div>
+                                <div id="flex-middle-raw" class="flex-gauge-raw" style="font-size:10px; color:var(--color-fg-muted); margin-top:3px; font-family:var(--font-mono);">ADC: --</div>
                             </div>
                             <div class="flex-gauge-item">
                                 <div class="flex-gauge-name">Ring</div>
@@ -162,6 +165,7 @@
                                     <div id="flex-ring-fill" class="flex-bar-vertical-fill"></div>
                                 </div>
                                 <div id="flex-ring-val" class="flex-gauge-val">0%</div>
+                                <div id="flex-ring-raw" class="flex-gauge-raw" style="font-size:10px; color:var(--color-fg-muted); margin-top:3px; font-family:var(--font-mono);">ADC: --</div>
                             </div>
                             <div class="flex-gauge-item">
                                 <div class="flex-gauge-name">Little</div>
@@ -169,6 +173,7 @@
                                     <div id="flex-little-fill" class="flex-bar-vertical-fill"></div>
                                 </div>
                                 <div id="flex-little-val" class="flex-gauge-val">0%</div>
+                                <div id="flex-little-raw" class="flex-gauge-raw" style="font-size:10px; color:var(--color-fg-muted); margin-top:3px; font-family:var(--font-mono);">ADC: --</div>
                             </div>
                         </div>
 
@@ -216,8 +221,43 @@
                         </div>
                     </div>
 
-                    <!-- Simulator Trigger Card -->
-                    <div class="Box">
+                    <!-- Live Hardware Status Card (Active in Hardware Mode) -->
+                    <div id="dashHardwareStatusCard" class="Box" style="display:none; border-color:var(--color-success-fg);">
+                        <div class="Box-header" style="background: rgba(46, 160, 67, 0.1);">
+                            <div class="Box-title">
+                                <span>🧤</span> Live ESP32 Hardware Stream
+                            </div>
+                            <span id="dashHwPortBadge" class="Label Label--success">COM3 (USB)</span>
+                        </div>
+                        <div class="Box-body">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                                <span style="font-size:12px; color:var(--color-fg-muted);">Hardware Status:</span>
+                                <strong id="dashHwStatusText" style="font-size:12px; color:var(--color-success-fg);">● Streaming (50Hz)</strong>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                                <span style="font-size:12px; color:var(--color-fg-muted);">Packets Received:</span>
+                                <span id="dashHwRxCount" style="font-family:var(--font-mono); font-size:12px; color:var(--color-accent-fg);">0</span>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; margin-bottom:14px;">
+                                <span style="font-size:12px; color:var(--color-fg-muted);">Sensor Health:</span>
+                                <span style="font-size:12px; color:var(--color-success-fg);">5 Flex + IMU OK</span>
+                            </div>
+                            <div style="background: var(--color-canvas-subtle); padding: 10px; border-radius: 6px; margin-bottom: 12px; font-size: 11px; color: var(--color-fg-muted); line-height: 1.4;">
+                                💡 <strong>Tip:</strong> Flex your fingers to see live ADC changes above. If finger percentages don't match your full fist range, click <strong>Calibrate Glove</strong> to tune your personal hand limits in 10 seconds!
+                            </div>
+                            <div style="display:flex; gap:8px;">
+                                <button class="btn btn-sm btn-primary" style="flex:1;" onclick="window.islApp.switchTab('calibration')">
+                                    🎯 Calibrate Glove
+                                </button>
+                                <button class="btn btn-sm" onclick="window.islApp.setMode('simulated')">
+                                    🧪 Switch to Simulator
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Simulator Trigger Card (Active in Simulator Mode) -->
+                    <div id="dashSimulatorCard" class="Box">
                         <div class="Box-header">
                             <div class="Box-title">
                                 <span>🧪</span> Biomechanical Sensor Simulator
@@ -610,29 +650,173 @@
              ========================================== -->
         <section id="tab-settings" class="tab-content">
             <div class="grid-2">
-                <div class="Box">
-                    <div class="Box-header">
-                        <div class="Box-title"><span>🔌</span> ESP32 Bluetooth & Serial Hardware Setup</div>
+                <div class="Box" id="hardwareConnectionCard">
+                    <div class="Box-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div class="Box-title"><span>🔌</span> ESP32 Connection Manager</div>
+                        <span id="activeConnBadge" class="Label Label--secondary">Disconnected</span>
                     </div>
                     <div class="Box-body">
-                        <div class="form-group">
-                            <label class="form-label">Available COM / Bluetooth Ports:</label>
-                            <div style="display: flex; gap: 8px;">
-                                <select id="serialPortSelect" class="form-select" style="flex:1;"></select>
-                                <button id="btnRefreshPorts" class="btn btn-sm">🔄 Refresh</button>
+                        <!-- Connection Option Tabs -->
+                        <div class="conn-tabs">
+                            <button id="tabBtnUsb" class="conn-tab-btn active" onclick="window.islApp.switchConnTab('usb')">
+                                <span>🔌</span> USB Port (Wired)
+                            </button>
+                            <button id="tabBtnCom" class="conn-tab-btn" onclick="window.islApp.switchConnTab('com')">
+                                <span>📶</span> COM Port (Bluetooth/Custom)
+                            </button>
+                            <button id="tabBtnWebSerial" class="conn-tab-btn" onclick="window.islApp.switchConnTab('webserial')">
+                                <span>🌐</span> Web Serial (Browser USB)
+                            </button>
+                        </div>
+
+                        <!-- PANEL 1: USB Port Connection -->
+                        <div id="connPanelUsb" class="conn-panel active">
+                            <div class="conn-header-badge">
+                                <span>⚡</span> Direct Hardware UART • 50Hz Low Latency • Zero Packet Drop
+                            </div>
+
+                            <div class="form-group" style="margin-bottom: 12px;">
+                                <label class="form-label" for="usbPortSelect">Detected USB Serial Port:</label>
+                                <div style="display: flex; gap: 8px;">
+                                    <select id="usbPortSelect" class="form-select" style="flex: 1;"></select>
+                                    <button id="btnRefreshUsbPorts" class="btn btn-sm">🔄 Refresh</button>
+                                </div>
+                            </div>
+
+                            <div class="form-group" style="margin-bottom: 14px;">
+                                <label class="form-label" for="usbBaudSelect">Baud Rate:</label>
+                                <select id="usbBaudSelect" class="form-select" style="width: 100%;">
+                                    <option value="115200" selected>115200 baud (ESP32 Default Recommended)</option>
+                                    <option value="230400">230400 baud (High Speed)</option>
+                                    <option value="460800">460800 baud (Ultra Speed)</option>
+                                    <option value="921600">921600 baud (Maximum)</option>
+                                    <option value="57600">57600 baud</option>
+                                    <option value="9600">9600 baud</option>
+                                </select>
+                            </div>
+
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                <button id="btnAutoConnectUsb" class="btn btn-primary btn-usb-auto" style="flex: 1; min-width: 180px;">
+                                    ⚡ 1-Click Auto-Detect & Connect
+                                </button>
+                                <button id="btnConnectUsb" class="btn btn-primary" style="flex: 1; min-width: 140px;">
+                                    Connect USB Port
+                                </button>
+                            </div>
+
+                            <div style="margin-top: 14px; font-size: 11px; color: var(--color-fg-muted); line-height: 1.5;">
+                                💡 <strong>Supported USB Chips:</strong> Silicon Labs CP2102/CP2104, WCH CH340/CH9102, FTDI FT232, and native ESP32-S2/S3 USB CDC. Connect USB cable from ESP32 to PC and click Auto-Detect.
                             </div>
                         </div>
 
-                        <div style="margin-top: 14px;">
-                            <button id="btnConnectSerial" class="btn btn-primary">Connect to Glove Hardware</button>
+                        <!-- PANEL 2: COM Port / Bluetooth Connection -->
+                        <div id="connPanelCom" class="conn-panel">
+                            <div class="conn-header-badge">
+                                <span>📶</span> Windows Serial COM Ports & Wireless Bluetooth SPP
+                            </div>
+
+                            <div class="form-group" style="margin-bottom: 12px;">
+                                <label class="form-label" for="comPortSelect">Available COM / Bluetooth Ports:</label>
+                                <div style="display: flex; gap: 8px;">
+                                    <select id="comPortSelect" class="form-select" style="flex: 1;"></select>
+                                    <button id="btnRefreshComPorts" class="btn btn-sm">🔄 Refresh</button>
+                                </div>
+                            </div>
+
+                            <div class="form-group" style="margin-bottom: 12px;">
+                                <label class="form-label" for="customComInput">Or Enter Custom COM Port Manually:</label>
+                                <input id="customComInput" type="text" class="form-control" placeholder="e.g. COM4, COM7, /dev/ttyUSB0" style="width: 100%; background: var(--color-canvas-inset); border: 1px solid var(--color-border-default); border-radius: var(--radius-sm); padding: 6px 10px; color: var(--color-fg-default); font-family: var(--font-mono);">
+                            </div>
+
+                            <div class="form-group" style="margin-bottom: 14px;">
+                                <label class="form-label" for="comBaudSelect">Baud Rate:</label>
+                                <select id="comBaudSelect" class="form-select" style="width: 100%;">
+                                    <option value="115200" selected>115200 baud</option>
+                                    <option value="9600">9600 baud</option>
+                                    <option value="38400">38400 baud</option>
+                                    <option value="57600">57600 baud</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <button id="btnConnectCom" class="btn btn-primary" style="width: 100%;">
+                                    Connect to COM Port
+                                </button>
+                            </div>
+
+                            <div style="margin-top: 14px; font-size: 11px; color: var(--color-fg-muted); line-height: 1.5;">
+                                <strong>Bluetooth SPP Pairing Guide:</strong><br>
+                                1. In Windows Settings &gt; Bluetooth, pair with <code>ISL-Glove-ESP32</code> (PIN: 1234).<br>
+                                2. An Outgoing Standard Serial Over Bluetooth COM port will be created.<br>
+                                3. Select it or type its name above and click Connect.
+                            </div>
                         </div>
 
-                        <div style="margin-top: 18px; font-size: 12px; color: var(--color-fg-muted); line-height: 1.5;">
-                            <strong>ESP32 Bluetooth Connection Guide:</strong><br>
-                            1. Pair your computer with <code>ISL-Glove-ESP32</code> in Windows Bluetooth Settings.<br>
-                            2. An Outgoing Standard Serial Over Bluetooth COM port (e.g. COM4) will be created.<br>
-                            3. Select that COM port above and click Connect.
+                        <!-- PANEL 3: Web Serial Browser USB Port -->
+                        <div id="connPanelWebSerial" class="conn-panel">
+                            <div class="conn-header-badge">
+                                <span>🌐</span> Direct WebUSB / Web Serial API (Chrome & Edge)
+                            </div>
+
+                            <p style="font-size: 12px; color: var(--color-fg-muted); margin-bottom: 14px; line-height: 1.5;">
+                                Connect your ESP32 USB cable directly inside your web browser without relying on any background Python serial processes! W3C Web Serial provides zero-latency native access.
+                            </p>
+
+                            <div id="webSerialSupportNotice" style="margin-bottom: 12px;"></div>
+
+                            <button id="btnWebSerialConnect" class="btn btn-primary" style="width: 100%;">
+                                🔗 Connect via Web Serial (Browser USB)
+                            </button>
                         </div>
+
+                        <!-- Real-Time Connection Telemetry & Status -->
+                        <div id="activeHwStatusBox" style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--color-border-muted);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span id="hwConnStatusDot" class="status-dot sim"></span>
+                                    <strong id="hwConnStatusTitle" style="font-size: 13px;">Hardware Offline (Using Biomechanical Simulator)</strong>
+                                </div>
+                                <button id="btnDisconnectHardware" class="btn btn-sm btn-danger" style="display: none;">Disconnect</button>
+                            </div>
+
+                            <div class="conn-telemetry-grid">
+                                <div class="conn-telemetry-item">
+                                    <div class="conn-telemetry-label">Interface</div>
+                                    <div class="conn-telemetry-val" id="telemetryType">None</div>
+                                </div>
+                                <div class="conn-telemetry-item">
+                                    <div class="conn-telemetry-label">Port</div>
+                                    <div class="conn-telemetry-val" id="telemetryPort">--</div>
+                                </div>
+                                <div class="conn-telemetry-item">
+                                    <div class="conn-telemetry-label">Baud Rate</div>
+                                    <div class="conn-telemetry-val" id="telemetryBaud">--</div>
+                                </div>
+                                <div class="conn-telemetry-item">
+                                    <div class="conn-telemetry-label">Packets Rx</div>
+                                    <div class="conn-telemetry-val" id="telemetryPacketsRx">0</div>
+                                </div>
+                                <div class="conn-telemetry-item">
+                                    <div class="conn-telemetry-label">Uptime</div>
+                                    <div class="conn-telemetry-val" id="telemetryUptime">0s</div>
+                                </div>
+                            </div>
+
+                            <!-- On-Device ESP32 Mode Command Selector (Visible when connected) -->
+                            <div id="espModeCommandGroup" style="display: none; margin-top: 10px; font-size: 12px;">
+                                <span style="color: var(--color-fg-muted); margin-right: 8px;">Switch ESP32 Interface:</span>
+                                <div class="gh-segmented-btn-group" style="display: inline-flex;">
+                                    <button class="gh-segment-btn" onclick="window.islApp.setEspCommMode('usb')">USB Only</button>
+                                    <button class="gh-segment-btn" onclick="window.islApp.setEspCommMode('bluetooth')">Bluetooth Only</button>
+                                    <button class="gh-segment-btn" onclick="window.islApp.setEspCommMode('dual')">Dual Mode</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Legacy hidden fields for backward compatibility -->
+                        <select id="serialPortSelect" style="display: none;"></select>
+                        <button id="btnConnectSerial" style="display: none;"></button>
+                        <button id="btnRefreshPorts" style="display: none;"></button>
                     </div>
                 </div>
 

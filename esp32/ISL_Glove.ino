@@ -71,14 +71,15 @@ void setup() {
         Serial.println("WARNING: MPU6050 not found or connection failed. Using fallback values.");
     }
 
-    // Initialize Bluetooth Serial
-    Serial.print("[INFO] Starting Bluetooth Serial (Device: ");
-    Serial.print(DEVICE_NAME);
+    // Initialize Communication Interface (USB Port / Bluetooth COM Port / Dual Mode)
+    Serial.print("[INFO] Initializing Communication (Mode: ");
+    Serial.print(DEFAULT_COMM_MODE == COMM_MODE_USB ? "USB Port Only" :
+                 (DEFAULT_COMM_MODE == COMM_MODE_BT ? "Bluetooth COM Port Only" : "Dual USB + Bluetooth"));
     Serial.print(")... ");
-    if (btHandler.begin(DEVICE_NAME)) {
+    if (btHandler.begin(DEVICE_NAME, DEFAULT_COMM_MODE)) {
         Serial.println("OK");
     } else {
-        Serial.println("FAILED (Proceeding with USB Serial only)");
+        Serial.println("WARNING: Falling back to USB Serial only");
     }
 
     // Initialize Optional OLED Display
@@ -117,9 +118,23 @@ void handleCommands() {
         btHandler.sendMessage("CALIB_IMU_SAVED");
     } else if (cmd == "PING") {
         btHandler.sendMessage("PONG");
+    } else if (cmd == "MODE_USB" || cmd == "SET_COMM_USB") {
+        btHandler.setMode(COMM_MODE_USB);
+        btHandler.sendMessage("COMM_MODE_SET:USB_PORT");
+        Serial.println("[COMM] Switched to USB Port only mode.");
+    } else if (cmd == "MODE_BT" || cmd == "SET_COMM_BT") {
+        btHandler.setMode(COMM_MODE_BT);
+        btHandler.sendMessage("COMM_MODE_SET:BLUETOOTH_COM");
+        Serial.println("[COMM] Switched to Bluetooth COM Port only mode.");
+    } else if (cmd == "MODE_DUAL" || cmd == "SET_COMM_DUAL") {
+        btHandler.setMode(COMM_MODE_DUAL);
+        btHandler.sendMessage("COMM_MODE_SET:DUAL_USB_BT");
+        Serial.println("[COMM] Switched to Dual USB + Bluetooth mode.");
     } else if (cmd == "STATUS") {
         String st = "STATUS: State=" + String(currentState) +
-                    ", BT=" + String(btHandler.isConnected() ? "CONNECTED" : "WAITING") +
+                    ", Comm=" + String(btHandler.getModeString()) +
+                    ", USB=" + String(btHandler.isUsbActive() ? "ACTIVE" : "OFF") +
+                    ", BT=" + String(btHandler.isBtActive() ? (btHandler.isConnected() ? "CONNECTED" : "WAITING") : "OFF") +
                     ", MPU=" + String(mpuHandler.isConnected() ? "OK" : "DISCONNECTED");
         btHandler.sendMessage(st);
     }

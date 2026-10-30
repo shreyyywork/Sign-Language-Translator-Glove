@@ -28,6 +28,9 @@ class SerialBluetoothManager:
 
         self.ser: Optional[serial.Serial] = None
         self.port: Optional[str] = None
+        self.connection_type: str = "disconnected"  # "usb", "bluetooth", "com", or "disconnected"
+        self.connected_at: Optional[float] = None
+        self.last_error: str = ""
         self.is_connected = False
         self.is_running = False
         self.thread: Optional[threading.Thread] = None
@@ -38,22 +41,117 @@ class SerialBluetoothManager:
         self._lock = threading.Lock()
 
     @staticmethod
-    def list_available_ports() -> List[Dict[str, str]]:
+    def identify_port(p) -> Dict[str, Any]:
+        """Classify a serial port as USB, Bluetooth, or Standard/Virtual COM with chip identification."""
+        desc = (p.description or "").lower()
+        hwid = (p.hwid or "").lower()
+        device = (p.device or "").lower()
+
+        is_bt = "bluetooth" in desc or "bth" in hwid or "bth" in device or "bthenum" in hwid
+
+        # Detect USB-UART bridge chips common on ESP32 dev boards
+        chip = "Standard Serial"
+        is_esp_candidate = False
+
+        if "cp210" in desc or "cp210" in hwid or getattr(p, "vid", None) == 0x10C4:
+            chip = "Silicon Labs CP210x (ESP32 NodeMCU)"
+            is_esp_candidate = True
+        elif "ch340" in desc or "ch341" in desc or "ch9102" in desc or getattr(p, "vid", None) == 0x1A86:
+            chip = "WCH CH340 / CH9102 (ESP32 DevKit)"
+            is_esp_candidate = True
+        elif "ftdi" in desc or "ft232" in desc or getattr(p, "vid", None) == 0x0403:
+            chip = "FTDI USB-to-UART"
+            is_esp_candidate = True
+        elif "espressif" in desc or "jtag" in desc or getattr(p, "vid", None) == 0x303A:
+            chip = "Espressif USB JTAG / CDC (ESP32-S2/S3/C3)"
+            is_esp_candidate = True
+        elif "prolific" in desc or "pl2303" in desc or getattr(p, "vid", None) == 0x067B:
+            chip = "Prolific USB Serial"
+        elif "usb" in desc or "usb" in hwid or getattr(p, "vid", None) is not None:
+            chip = "USB Serial Device"
+            is_esp_candidate = True
+
+        is_usb = not is_bt and ("usb" in desc or "usb" in hwid or getattr(p, "vid", None) is not None or is_esp_candidate)
+
+        if is_usb:
+            port_type = "usb"
+        elif is_bt:
+            port_type = "bluetooth"
+        else:
+            port_type = "com"
+
+        return {
+            "port": p.device,
+            "description": p.description,
+            "hwid": p.hwid,
+            "port_type": port_type,
+            "is_usb": is_usb,
+            "is_bluetooth": is_bt,
+            "chip": chip,
+            "is_esp32_candidate": is_esp_candidate
+        }
+
+    @classmethod
+    def list_available_ports(cls) -> List[Dict[str, Any]]:
         """List all available USB serial and Bluetooth COM ports."""
         ports = serial.tools.list_ports.comports()
-        result = []
-        for p in ports:
-            result.append({
-                "port": p.device,
-                "description": p.description,
-                "hwid": p.hwid,
-                "is_bluetooth": "bluetooth" in p.description.lower() or "bth" in p.hwid.lower()
-            })
-        return result
+        return [cls.identify_port(p) for p in ports]
 
-    def connect(self, port_name: str) -> bool:
-        """Connect to a specific Serial / Bluetooth COM port."""
+    @classmethod
+    def list_categorized_ports(cls) -> Dict[str, Any]:
+        """Categorize ports into USB, Bluetooth, and Other COM ports with ESP32 recommendation."""
+        all_ports = cls.list_available_ports()
+        usb_ports = [p for p in all_ports if p["is_usb"]]
+        bluetooth_ports = [p for p in all_ports if p["is_bluetooth"]]
+        other_com_ports = [p for p in all_ports if not p["is_usb"] and not p["is_bluetooth"]]
+
+        # Recommend best candidate ESP32 USB port
+        recommended_usb = None
+        candidates = [p for p in usb_ports if p["is_esp32_candidate"]]
+        if candidates:
+            recommended_usb = candidates[0]["port"]
+        elif usb_ports:
+            recommended_usb = usb_ports[0]["port"]
+
+        return {
+            "ports": all_ports,  # Preserved for backward compatibility
+            "all_ports": all_ports,
+            "usb_ports": usb_ports,
+            "bluetooth_ports": bluetooth_ports,
+            "other_com_ports": other_com_ports,
+            "recommended_usb_port": recommended_usb,
+            "recommended_baud": 115200,
+            "supported_bauds": [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600]
+        }
+
+    @classmethod
+    def auto_detect_esp32_usb(cls) -> Optional[str]:
+        """Automatically find the best candidate USB port for an ESP32 board."""
+        categorized = cls.list_categorized_ports()
+        return categorized.get("recommended_usb_port")
+
+    def connect(
+        self,
+        port_name: str,
+        baud_rate: Optional[int] = None,
+        connection_type: str = "auto"
+    ) -> bool:
+        """Connect to a specific USB Serial or Bluetooth COM port."""
         self.disconnect()
+        if baud_rate:
+            self.baud_rate = baud_rate
+
+        # Determine connection type if auto
+        if connection_type == "auto":
+            ports = self.list_available_ports()
+            matching = [p for p in ports if p["port"].upper() == port_name.upper()]
+            if matching:
+                self.connection_type = matching[0]["port_type"]
+            else:
+                self.connection_type = "com"
+        else:
+            self.connection_type = connection_type
+
         try:
             self.ser = serial.Serial(
                 port=port_name,
@@ -63,16 +161,31 @@ class SerialBluetoothManager:
             self.port = port_name
             self.is_connected = True
             self.is_running = True
+            self.connected_at = time.time()
+            self.last_error = ""
             self.packets_received = 0
             self.packets_dropped = 0
 
             self.thread = threading.Thread(target=self._read_loop, daemon=True)
             self.thread.start()
-            print(f"Connected to ESP32 on {port_name} at {self.baud_rate} baud.")
+            print(f"Connected to ESP32 on {port_name} via {self.connection_type.upper()} at {self.baud_rate} baud.")
             return True
         except Exception as e:
-            print(f"Failed to connect to {port_name}: {e}")
+            err_str = str(e)
+            if "Access is denied" in err_str or "PermissionError" in err_str:
+                self.last_error = (
+                    f"Access denied on {port_name}. This port is currently locked by another application "
+                    f"(such as the Arduino IDE Serial Monitor or Serial Plotter). "
+                    f"Please close the Serial Monitor in Arduino IDE and click Connect again."
+                )
+            elif "FileNotFoundError" in err_str or "cannot find the file" in err_str.lower():
+                self.last_error = f"Port {port_name} not found. Please verify the ESP32 USB cable is securely connected."
+            else:
+                self.last_error = f"Failed to connect to {port_name}: {err_str}"
+
+            print(f"[SERIAL ERROR] {self.last_error}")
             self.is_connected = False
+            self.connection_type = "disconnected"
             return False
 
     def disconnect(self):
@@ -86,6 +199,8 @@ class SerialBluetoothManager:
         self.is_connected = False
         self.ser = None
         self.port = None
+        self.connection_type = "disconnected"
+        self.connected_at = None
 
     def send_command(self, command: str) -> bool:
         """Send a string command to the ESP32 (e.g., START, STOP, CALIB_STRAIGHT)."""
@@ -177,12 +292,31 @@ class SerialBluetoothManager:
         with self._lock:
             return self.latest_sample.copy() if self.latest_sample else None
 
+    def set_esp_comm_mode(self, mode: str) -> bool:
+        """
+        Send command to switch ESP32 between USB and Bluetooth modes.
+        mode can be 'usb', 'bluetooth', or 'dual'.
+        """
+        mode_upper = mode.strip().upper()
+        if mode_upper in ["USB", "USB_PORT"]:
+            cmd = "MODE_USB"
+        elif mode_upper in ["BT", "BLUETOOTH", "BLUETOOTH_COM"]:
+            cmd = "MODE_BT"
+        elif mode_upper in ["DUAL", "DUAL_USB_BT"]:
+            cmd = "MODE_DUAL"
+        else:
+            return False
+        return self.send_command(cmd)
+
     def get_status(self) -> Dict[str, Any]:
         """Get communication link status and packet counters."""
+        uptime = round(time.time() - self.connected_at, 1) if (self.is_connected and self.connected_at) else 0
         return {
             "is_connected": self.is_connected,
             "port": self.port,
+            "connection_type": self.connection_type,
             "baud_rate": self.baud_rate,
+            "uptime_seconds": uptime,
             "packets_received": self.packets_received,
             "packets_dropped": self.packets_dropped
         }

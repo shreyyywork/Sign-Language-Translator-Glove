@@ -3,14 +3,56 @@
 BluetoothHandler::BluetoothHandler() {
     _isInitialized = false;
     _isClientConnected = false;
+    _commMode = DEFAULT_COMM_MODE;
 }
 
-bool BluetoothHandler::begin(const char* deviceName) {
-    if (_serialBT.begin(deviceName)) {
-        _isInitialized = true;
+bool BluetoothHandler::begin(const char* deviceName, int mode) {
+    _commMode = mode;
+
+    // If USB only mode, skip Bluetooth initialization to conserve RAM and power
+    if (_commMode == COMM_MODE_USB) {
+        _isInitialized = false;
+        Serial.println("[COMM] Active Mode: USB Port Only (Hardware UART @ 115200 baud)");
         return true;
     }
+
+    // Initialize Bluetooth Serial for COMM_MODE_BT or COMM_MODE_DUAL
+    if (_serialBT.begin(deviceName)) {
+        _isInitialized = true;
+        if (_commMode == COMM_MODE_BT) {
+            Serial.println("[COMM] Active Mode: Bluetooth COM Port Only");
+        } else {
+            Serial.println("[COMM] Active Mode: Dual Mode (USB Port + Bluetooth COM Port)");
+        }
+        return true;
+    }
+
+    // Fallback to USB mode if Bluetooth initialization fails
+    _commMode = COMM_MODE_USB;
+    _isInitialized = false;
+    Serial.println("[COMM] Bluetooth init failed, falling back to USB Port only.");
     return false;
+}
+
+void BluetoothHandler::setMode(int mode) {
+    _commMode = mode;
+}
+
+const char* BluetoothHandler::getModeString() const {
+    switch (_commMode) {
+        case COMM_MODE_USB: return "USB_PORT";
+        case COMM_MODE_BT: return "BLUETOOTH_COM";
+        case COMM_MODE_DUAL: return "DUAL_USB_BT";
+        default: return "UNKNOWN";
+    }
+}
+
+bool BluetoothHandler::isUsbActive() const {
+    return (_commMode == COMM_MODE_USB || _commMode == COMM_MODE_DUAL);
+}
+
+bool BluetoothHandler::isBtActive() const {
+    return (_commMode == COMM_MODE_BT || _commMode == COMM_MODE_DUAL) && _isInitialized;
 }
 
 uint8_t BluetoothHandler::calculateChecksum(const String &payload) {
@@ -39,32 +81,37 @@ void BluetoothHandler::sendSensorPacket(const FlexData &flex, const IMUData &imu
     uint8_t crc = calculateChecksum(payload);
     String fullPacket = "$" + payload + "*" + String(crc, HEX) + "\n";
 
-    // Transmit over both Bluetooth and Serial Monitor
-    if (_isInitialized) {
+    // Transmit over Bluetooth if active
+    if (isBtActive()) {
         _serialBT.print(fullPacket);
     }
-    Serial.print(fullPacket);
+    // Transmit over USB Serial if active
+    if (isUsbActive()) {
+        Serial.print(fullPacket);
+    }
 }
 
 void BluetoothHandler::sendMessage(const String &msg) {
     String formatted = "$MSG," + msg + "\n";
-    if (_isInitialized) {
+    if (isBtActive()) {
         _serialBT.print(formatted);
     }
-    Serial.print(formatted);
+    if (isUsbActive()) {
+        Serial.print(formatted);
+    }
 }
 
 bool BluetoothHandler::hasCommand() {
-    if (_isInitialized && _serialBT.available()) return true;
-    if (Serial.available()) return true;
+    if (isBtActive() && _serialBT.available()) return true;
+    if (isUsbActive() && Serial.available()) return true;
     return false;
 }
 
 String BluetoothHandler::readCommand() {
     String cmd = "";
-    if (_isInitialized && _serialBT.available()) {
+    if (isBtActive() && _serialBT.available()) {
         cmd = _serialBT.readStringUntil('\n');
-    } else if (Serial.available()) {
+    } else if (isUsbActive() && Serial.available()) {
         cmd = Serial.readStringUntil('\n');
     }
     cmd.trim();
@@ -72,8 +119,9 @@ String BluetoothHandler::readCommand() {
 }
 
 bool BluetoothHandler::isConnected() {
-    if (_isInitialized) {
+    if (isBtActive()) {
         return _serialBT.hasClient();
     }
-    return false;
+    // In USB mode, Serial is always active once plugged into PC USB port
+    return isUsbActive();
 }

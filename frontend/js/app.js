@@ -31,6 +31,21 @@ class ISLGloveApp {
         this.translationHistory = [];
         this.sentenceBuffer = [];
 
+        // Hardware Connection state
+        this.activeConnTab = 'usb';
+        this.hardwareStatus = {
+            isConnected: false,
+            port: null,
+            baudRate: 115200,
+            connectionType: 'disconnected',
+            packetsReceived: 0,
+            packetsDropped: 0,
+            uptimeSeconds: 0
+        };
+        this.webSerialPort = null;
+        this.webSerialReader = null;
+        this.isWebSerialRunning = false;
+
         this.init();
     }
 
@@ -43,6 +58,7 @@ class ISLGloveApp {
         await this.loadSerialPorts();
         this.connectWebSocket();
         this.initSpeechSynth();
+        this.checkWebSerialSupport();
     }
 
     initDOM() {
@@ -57,7 +73,15 @@ class ISLGloveApp {
 
         // Mode Toggles
         document.getElementById('btnSimMode')?.addEventListener('click', () => this.setMode('simulated'));
-        document.getElementById('btnHwMode')?.addEventListener('click', () => this.setMode('hardware'));
+        document.getElementById('btnHwMode')?.addEventListener('click', async () => {
+            const isConn = this.hardwareStatus?.is_connected || this.hardwareStatus?.isConnected || this.isWebSerialRunning;
+            if (isConn) {
+                await this.setMode('hardware');
+            } else {
+                // If not connected yet, 1-click auto-connect to USB port
+                await this.autoConnectUsb();
+            }
+        });
 
         // Simulator Gesture Selector
         document.getElementById('simGestureSelect')?.addEventListener('change', (e) => {
@@ -87,8 +111,23 @@ class ISLGloveApp {
             this.ttsLanguage = e.target.value;
         });
 
-        // Serial Connect/Disconnect
-        document.getElementById('btnConnectSerial')?.addEventListener('click', () => this.connectSerial());
+        // USB Port Connection Controls
+        document.getElementById('btnRefreshUsbPorts')?.addEventListener('click', () => this.loadSerialPorts());
+        document.getElementById('btnAutoConnectUsb')?.addEventListener('click', () => this.autoConnectUsb());
+        document.getElementById('btnConnectUsb')?.addEventListener('click', () => this.connectUsbPort());
+
+        // COM Port / Bluetooth Controls
+        document.getElementById('btnRefreshComPorts')?.addEventListener('click', () => this.loadSerialPorts());
+        document.getElementById('btnConnectCom')?.addEventListener('click', () => this.connectComPort());
+
+        // Web Serial Browser USB Port
+        document.getElementById('btnWebSerialConnect')?.addEventListener('click', () => this.toggleWebSerial());
+
+        // Disconnect Hardware
+        document.getElementById('btnDisconnectHardware')?.addEventListener('click', () => this.disconnectHardware());
+
+        // Legacy support
+        document.getElementById('btnConnectSerial')?.addEventListener('click', () => this.connectUsbPort());
         document.getElementById('btnRefreshPorts')?.addEventListener('click', () => this.loadSerialPorts());
     }
 
@@ -182,6 +221,12 @@ class ISLGloveApp {
             if (dot) {
                 dot.className = `status-dot ${this.mode === 'simulated' ? 'sim' : 'online'}`;
             }
+
+            // Toggle dashboard cards between simulator and live hardware
+            const simCard = document.getElementById('dashSimulatorCard');
+            const hwCard = document.getElementById('dashHardwareStatusCard');
+            if (simCard) simCard.style.display = (this.mode === 'simulated') ? 'block' : 'none';
+            if (hwCard) hwCard.style.display = (this.mode === 'hardware') ? 'block' : 'none';
         } catch (e) {
             console.error('Error setting mode:', e);
         }
@@ -241,9 +286,41 @@ class ISLGloveApp {
     }
 
     handleStreamPayload(payload) {
+        if (payload.mode && payload.mode !== this.mode) {
+            this.mode = payload.mode;
+            document.getElementById('btnSimMode')?.classList.toggle('active', this.mode === 'simulated');
+            document.getElementById('btnHwMode')?.classList.toggle('active', this.mode === 'hardware');
+            const simCard = document.getElementById('dashSimulatorCard');
+            const hwCard = document.getElementById('dashHardwareStatusCard');
+            if (simCard) simCard.style.display = (this.mode === 'simulated') ? 'block' : 'none';
+            if (hwCard) hwCard.style.display = (this.mode === 'hardware') ? 'block' : 'none';
+        }
+
+        if (payload.is_waiting_hardware) {
+            const hwStatus = document.getElementById('dashHwStatusText');
+            if (hwStatus) {
+                hwStatus.textContent = '⏳ Waiting for ESP32 packets...';
+                hwStatus.style.color = 'var(--color-attention-fg)';
+            }
+            return;
+        }
+
         const raw = payload.raw_sample || {};
         const pred = payload.prediction || {};
         const calib = pred.calibrated_features || raw;
+
+        // Update Hardware Status Card if active
+        if (this.mode === 'hardware') {
+            const hwStatus = document.getElementById('dashHwStatusText');
+            if (hwStatus) {
+                hwStatus.textContent = '● Streaming Live (50Hz)';
+                hwStatus.style.color = 'var(--color-success-fg)';
+            }
+            const hwRx = document.getElementById('dashHwRxCount');
+            if (hwRx && payload.packets_received !== undefined) {
+                hwRx.textContent = payload.packets_received.toLocaleString();
+            }
+        }
 
         // 1. Update Hand Visualizer
         if (this.visualizer) {
@@ -296,8 +373,14 @@ class ISLGloveApp {
             
             const fillEl = document.getElementById(`flex-${f}-fill`);
             const valEl = document.getElementById(`flex-${f}-val`);
+            const rawEl = document.getElementById(`flex-${f}-raw`);
+
             if (fillEl) fillEl.style.height = `${pct}%`;
             if (valEl) valEl.textContent = `${pct.toFixed(0)}%`;
+            if (rawEl) {
+                const rawCount = raw[f] !== undefined ? Math.round(raw[f]) : '--';
+                rawEl.textContent = `ADC: ${rawCount}`;
+            }
         });
 
         const setVal = (id, v) => {
@@ -715,45 +798,450 @@ class ISLGloveApp {
     }
 
     // ==========================================
-    // Serial Hardware Management
+    // Hardware Connection Management (USB & COM)
     // ==========================================
+    switchConnTab(tabName) {
+        this.activeConnTab = tabName;
+        document.querySelectorAll('.conn-tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.conn-panel').forEach(p => p.classList.remove('active'));
+
+        if (tabName === 'usb') {
+            document.getElementById('tabBtnUsb')?.classList.add('active');
+            document.getElementById('connPanelUsb')?.classList.add('active');
+        } else if (tabName === 'com') {
+            document.getElementById('tabBtnCom')?.classList.add('active');
+            document.getElementById('connPanelCom')?.classList.add('active');
+        } else if (tabName === 'webserial') {
+            document.getElementById('tabBtnWebSerial')?.classList.add('active');
+            document.getElementById('connPanelWebSerial')?.classList.add('active');
+            this.checkWebSerialSupport();
+        }
+    }
+
+    checkWebSerialSupport() {
+        const notice = document.getElementById('webSerialSupportNotice');
+        if (!notice) return;
+        if ('serial' in navigator) {
+            notice.innerHTML = '<span class="Label Label--success" style="font-size:11px;">✓ Web Serial is supported in this browser</span>';
+        } else {
+            notice.innerHTML = '<span class="Label Label--attention" style="font-size:11px;">⚠️ Web Serial requires Google Chrome, Microsoft Edge, or Opera. Use USB Port or COM Port options above.</span>';
+            const btn = document.getElementById('btnWebSerialConnect');
+            if (btn) btn.disabled = true;
+        }
+    }
+
     async loadSerialPorts() {
         try {
             const res = await fetch('/api/serial/ports');
             const data = await res.json();
-            const sel = document.getElementById('serialPortSelect');
-            if (!sel) return;
 
-            sel.innerHTML = '';
-            if (data.ports.length === 0) {
-                sel.appendChild(new Option('No hardware COM ports found (Use Simulator)', 'none'));
-            } else {
-                data.ports.forEach(p => {
-                    sel.appendChild(new Option(`${p.port} - ${p.description}`, p.port));
+            // Populate USB Ports dropdown
+            const usbSel = document.getElementById('usbPortSelect');
+            if (usbSel) {
+                usbSel.innerHTML = '';
+                const usbPorts = data.usb_ports || [];
+                if (usbPorts.length === 0) {
+                    usbSel.appendChild(new Option('No USB UART ports found (Plug in ESP32 USB cable)', 'none'));
+                } else {
+                    usbPorts.forEach(p => {
+                        const label = `${p.port} - ${p.chip || p.description}`;
+                        const opt = new Option(label, p.port);
+                        if (p.is_esp32_candidate) {
+                            opt.style.fontWeight = 'bold';
+                        }
+                        usbSel.appendChild(opt);
+                    });
+                    if (data.recommended_usb_port) {
+                        usbSel.value = data.recommended_usb_port;
+                    }
+                }
+            }
+
+            // Populate COM Ports dropdown (Bluetooth & others)
+            const comSel = document.getElementById('comPortSelect');
+            if (comSel) {
+                comSel.innerHTML = '';
+                const comPorts = (data.bluetooth_ports || []).concat(data.other_com_ports || []);
+                if (comPorts.length === 0) {
+                    comSel.appendChild(new Option('No Bluetooth or virtual COM ports found', 'none'));
+                } else {
+                    comPorts.forEach(p => {
+                        const typeTag = p.is_bluetooth ? '[Bluetooth SPP]' : '[Serial COM]';
+                        comSel.appendChild(new Option(`${p.port} ${typeTag} - ${p.description}`, p.port));
+                    });
+                }
+            }
+
+            // Legacy select for backward compatibility
+            const legacySel = document.getElementById('serialPortSelect');
+            if (legacySel) {
+                legacySel.innerHTML = '';
+                const all = data.ports || data.all_ports || [];
+                all.forEach(p => {
+                    legacySel.appendChild(new Option(`${p.port} - ${p.description}`, p.port));
                 });
+            }
+
+            // Sync active status
+            if (data.active_status) {
+                this.updateHardwareUI(data.active_status);
             }
         } catch (e) {
             console.error('Error loading ports:', e);
         }
     }
 
-    async connectSerial() {
-        const port = document.getElementById('serialPortSelect')?.value;
+    async autoConnectUsb() {
+        const btn = document.getElementById('btnAutoConnectUsb');
+        const origText = btn ? btn.textContent : '';
+        if (btn) btn.textContent = '⏳ Scanning & Connecting...';
+        try {
+            const res = await fetch('/api/serial/auto_connect', { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                alert(`⚡ Successfully auto-connected to ESP32 on USB Port ${data.port} at 115200 baud!`);
+                await this.setMode('hardware');
+                await this.loadSerialPorts();
+            } else {
+                alert(data.detail || 'Failed to auto-detect ESP32 USB port. Please ensure USB cable is securely connected.');
+            }
+        } catch (e) {
+            console.error('Auto connect USB error:', e);
+            alert('Failed to connect to USB port.');
+        } finally {
+            if (btn) btn.textContent = origText || '⚡ 1-Click Auto-Detect & Connect';
+        }
+    }
+
+    async connectUsbPort() {
+        const port = document.getElementById('usbPortSelect')?.value || document.getElementById('serialPortSelect')?.value;
+        const baud = document.getElementById('usbBaudSelect')?.value || 115200;
         if (!port || port === 'none') {
-            alert('Please select a valid hardware COM port or Bluetooth virtual port.');
+            alert('Please select a valid USB Serial port or click Auto-Detect.');
             return;
         }
 
         try {
-            const res = await fetch(`/api/serial/connect?port=${encodeURIComponent(port)}`, { method: 'POST' });
+            const res = await fetch(`/api/serial/connect?port=${encodeURIComponent(port)}&baud_rate=${baud}&connection_type=usb`, { method: 'POST' });
+            const data = await res.json();
             if (res.ok) {
-                alert(`Successfully connected to ESP32 on ${port}!`);
-                this.setMode('hardware');
+                alert(`Connected to ESP32 on USB Port ${port} (${baud} baud)!`);
+                await this.setMode('hardware');
+                await this.loadSerialPorts();
             } else {
-                alert(`Failed to connect to ${port}.`);
+                alert(data.detail || `Failed to connect to USB Port ${port}.`);
             }
         } catch (e) {
-            console.error('Serial connect error:', e);
+            console.error('USB Connect error:', e);
+            alert(`Error connecting to USB port ${port}`);
+        }
+    }
+
+    async connectComPort() {
+        const customPort = document.getElementById('customComInput')?.value?.trim();
+        const selectedPort = document.getElementById('comPortSelect')?.value;
+        const port = customPort || selectedPort;
+        const baud = document.getElementById('comBaudSelect')?.value || 115200;
+
+        if (!port || port === 'none') {
+            alert('Please select a COM port from the dropdown or type a custom COM port name (e.g. COM4).');
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/serial/connect?port=${encodeURIComponent(port)}&baud_rate=${baud}&connection_type=bluetooth`, { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                alert(`Connected to ESP32 on COM Port ${port} (${baud} baud)!`);
+                await this.setMode('hardware');
+                await this.loadSerialPorts();
+            } else {
+                alert(data.detail || `Failed to connect to COM Port ${port}.`);
+            }
+        } catch (e) {
+            console.error('COM Connect error:', e);
+            alert(`Error connecting to COM port ${port}`);
+        }
+    }
+
+    // Legacy method
+    async connectSerial() {
+        return this.connectUsbPort();
+    }
+
+    async toggleWebSerial() {
+        if (!('serial' in navigator)) {
+            alert('Web Serial API is not supported in this browser. Please use Google Chrome or Microsoft Edge.');
+            return;
+        }
+
+        if (this.isWebSerialRunning) {
+            await this.disconnectWebSerial();
+            return;
+        }
+
+        try {
+            this.webSerialPort = await navigator.serial.requestPort();
+            await this.webSerialPort.open({ baudRate: 115200 });
+            this.isWebSerialRunning = true;
+
+            const btn = document.getElementById('btnWebSerialConnect');
+            if (btn) {
+                btn.textContent = '🔌 Disconnect Web Serial';
+                btn.className = 'btn btn-danger';
+            }
+
+            this.updateHardwareUI({
+                is_connected: true,
+                port: 'Browser WebUSB',
+                connection_type: 'webserial',
+                baud_rate: 115200,
+                packets_received: 0,
+                packets_dropped: 0,
+                uptime_seconds: 0
+            });
+
+            await this.setMode('hardware');
+            this.readWebSerialLoop();
+        } catch (e) {
+            console.error('Web Serial connection error:', e);
+            alert(`Web Serial connection error: ${e.message || e}`);
+        }
+    }
+
+    async readWebSerialLoop() {
+        let buffer = '';
+        let rxCount = 0;
+        const startTime = Date.now();
+
+        try {
+            while (this.webSerialPort && this.webSerialPort.readable && this.isWebSerialRunning) {
+                const textDecoder = new TextDecoderStream();
+                this.webSerialPort.readable.pipeTo(textDecoder.writable);
+                const reader = textDecoder.readable.getReader();
+                this.webSerialReader = reader;
+
+                try {
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+                        if (value) {
+                            buffer += value;
+                            const lines = buffer.split('\n');
+                            buffer = lines.pop();
+
+                            for (const line of lines) {
+                                const trimmed = line.trim();
+                                if (!trimmed) continue;
+                                const sample = this.parseISLPacket(trimmed);
+                                if (sample) {
+                                    rxCount++;
+                                    this.handleStreamPayload({
+                                        type: 'sensor_frame',
+                                        timestamp: sample.timestamp,
+                                        mode: 'hardware',
+                                        connection_type: 'webserial',
+                                        hardware_port: 'Browser WebUSB',
+                                        raw_sample: sample,
+                                        prediction: this.localPredict(sample),
+                                        is_recording: this.isRecording
+                                    });
+
+                                    if (rxCount % 25 === 0) {
+                                        const uptime = Math.round((Date.now() - startTime) / 1000);
+                                        const pRx = document.getElementById('telemetryPacketsRx');
+                                        const pUp = document.getElementById('telemetryUptime');
+                                        if (pRx) pRx.textContent = rxCount.toLocaleString();
+                                        if (pUp) pUp.textContent = `${uptime}s`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (readErr) {
+                    console.warn('Web Serial stream ended:', readErr);
+                } finally {
+                    reader.releaseLock();
+                }
+            }
+        } catch (err) {
+            console.error('Web Serial loop error:', err);
+        }
+    }
+
+    parseISLPacket(line) {
+        if (!line.startsWith('$ISL') && !line.startsWith('ISL')) return null;
+        let payload = line;
+        if (payload.includes('*')) {
+            payload = payload.split('*')[0];
+        }
+        if (payload.startsWith('$')) {
+            payload = payload.substring(1);
+        }
+        const parts = payload.split(',');
+        if (parts.length < 12) return null;
+
+        try {
+            return {
+                thumb: parseFloat(parts[1]),
+                index: parseFloat(parts[2]),
+                middle: parseFloat(parts[3]),
+                ring: parseFloat(parts[4]),
+                little: parseFloat(parts[5]),
+                acc_x: parseFloat(parts[6]),
+                acc_y: parseFloat(parts[7]),
+                acc_z: parseFloat(parts[8]),
+                gyro_x: parseFloat(parts[9]),
+                gyro_y: parseFloat(parts[10]),
+                gyro_z: parseFloat(parts[11]),
+                timestamp: Date.now() / 1000,
+                is_simulated: false
+            };
+        } catch (e) {
+            return null;
+        }
+    }
+
+    localPredict(sample) {
+        return {
+            gesture: 'STREAMING',
+            confidence: 0.95,
+            calibrated_features: sample
+        };
+    }
+
+    async disconnectWebSerial() {
+        this.isWebSerialRunning = false;
+        try {
+            if (this.webSerialReader) {
+                await this.webSerialReader.cancel();
+            }
+            if (this.webSerialPort) {
+                await this.webSerialPort.close();
+            }
+        } catch (e) {
+            console.warn('Error closing Web Serial:', e);
+        }
+        this.webSerialPort = null;
+        this.webSerialReader = null;
+
+        const btn = document.getElementById('btnWebSerialConnect');
+        if (btn) {
+            btn.textContent = '🔗 Connect via Web Serial (Browser USB)';
+            btn.className = 'btn btn-primary';
+        }
+        await this.disconnectHardware();
+    }
+
+    async disconnectHardware() {
+        if (this.isWebSerialRunning) {
+            this.isWebSerialRunning = false;
+            try {
+                if (this.webSerialReader) await this.webSerialReader.cancel();
+                if (this.webSerialPort) await this.webSerialPort.close();
+            } catch (e) {}
+            this.webSerialPort = null;
+        }
+
+        try {
+            await fetch('/api/serial/disconnect', { method: 'POST' });
+        } catch (e) {
+            console.error('Disconnect error:', e);
+        }
+
+        this.updateHardwareUI({
+            is_connected: false,
+            port: null,
+            connection_type: 'disconnected',
+            baud_rate: 115200,
+            packets_received: 0,
+            packets_dropped: 0,
+            uptime_seconds: 0
+        });
+
+        await this.setMode('simulated');
+        await this.loadSerialPorts();
+    }
+
+    async setEspCommMode(mode) {
+        try {
+            const res = await fetch('/api/serial/set_comm_mode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(`ESP32 communication interface switched to: ${mode.toUpperCase()}`);
+            } else {
+                alert(data.detail || 'Failed to switch ESP32 mode.');
+            }
+        } catch (e) {
+            console.error('Mode switch error:', e);
+        }
+    }
+
+    updateHardwareUI(status) {
+        this.hardwareStatus = {
+            ...status,
+            isConnected: Boolean(status && status.is_connected),
+            is_connected: Boolean(status && status.is_connected)
+        };
+        const isConn = Boolean(status && status.is_connected);
+
+        const dot = document.getElementById('hwConnStatusDot');
+        const title = document.getElementById('hwConnStatusTitle');
+        const badge = document.getElementById('activeConnBadge');
+        const btnDisconnect = document.getElementById('btnDisconnectHardware');
+        const modeGroup = document.getElementById('espModeCommandGroup');
+
+        const typeEl = document.getElementById('telemetryType');
+        const portEl = document.getElementById('telemetryPort');
+        const baudEl = document.getElementById('telemetryBaud');
+        const rxEl = document.getElementById('telemetryPacketsRx');
+        const upEl = document.getElementById('telemetryUptime');
+
+        if (isConn) {
+            const connType = (status.connection_type || 'usb').toUpperCase();
+            if (dot) dot.className = 'status-dot online';
+            if (title) title.textContent = `Connected to ESP32 via ${connType} Port (${status.port || 'COM'})`;
+            if (badge) {
+                badge.className = 'Label Label--success';
+                badge.textContent = `${connType}: ${status.port}`;
+            }
+            if (btnDisconnect) btnDisconnect.style.display = 'inline-block';
+            if (modeGroup) modeGroup.style.display = 'block';
+
+            if (typeEl) typeEl.textContent = connType;
+            if (portEl) portEl.textContent = status.port || '--';
+            if (baudEl) baudEl.textContent = status.baud_rate ? `${status.baud_rate}` : '115200';
+            if (rxEl) rxEl.textContent = (status.packets_received || 0).toLocaleString();
+            if (upEl) upEl.textContent = `${status.uptime_seconds || 0}s`;
+
+            const hwBtn = document.getElementById('btnHwMode');
+            if (hwBtn) {
+                hwBtn.innerHTML = `<span>🔌</span> ${status.port} (${connType})`;
+            }
+        } else {
+            if (dot) dot.className = 'status-dot sim';
+            if (title) title.textContent = 'Hardware Offline (Using Biomechanical Simulator)';
+            if (badge) {
+                badge.className = 'Label Label--secondary';
+                badge.textContent = 'Disconnected';
+            }
+            if (btnDisconnect) btnDisconnect.style.display = 'none';
+            if (modeGroup) modeGroup.style.display = 'none';
+
+            if (typeEl) typeEl.textContent = 'None';
+            if (portEl) portEl.textContent = '--';
+            if (baudEl) baudEl.textContent = '--';
+            if (rxEl) rxEl.textContent = '0';
+            if (upEl) upEl.textContent = '0s';
+
+            const hwBtn = document.getElementById('btnHwMode');
+            if (hwBtn) {
+                hwBtn.innerHTML = `<span>🔌</span> ESP32 Hardware`;
+            }
         }
     }
 }

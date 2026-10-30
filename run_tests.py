@@ -14,6 +14,8 @@ import traceback
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+import sitecustomize  # noqa: F401 - Windows Code Integrity compatibility shim
+
 
 def run_all_tests():
     print("=" * 70)
@@ -216,6 +218,36 @@ def run_all_tests():
     ]
 
     for name, fn in api_tests:
+        total_tests += 1
+        t0 = time.time()
+        try:
+            fn()
+            print(f"  [PASS] {name} ({time.time()-t0:.3f}s)")
+            passed_tests += 1
+        except Exception as e:
+            print(f"  [FAIL] {name} -> {e}")
+            traceback.print_exc()
+            failed_tests += 1
+
+    # ----------------------------------------------------
+    # Suite 8: USB and COM Port Hardware Manager
+    # ----------------------------------------------------
+    print("\n[SUITE 8] Testing USB Port and COM Port Hardware Manager...")
+    from tests.test_serial import (
+        test_identify_port_usb,
+        test_identify_port_bluetooth,
+        test_list_categorized_ports_mocked,
+        test_set_esp_comm_mode
+    )
+
+    serial_tests = [
+        ("Identify USB Port & ESP32 Chipsets", test_identify_port_usb),
+        ("Identify Bluetooth SPP COM Port", test_identify_port_bluetooth),
+        ("Categorize Ports into USB and COM", test_list_categorized_ports_mocked),
+        ("ESP32 Mode Switching Commands", test_set_esp_comm_mode),
+    ]
+
+    for name, fn in serial_tests:
         total_tests += 1
         t0 = time.time()
         try:

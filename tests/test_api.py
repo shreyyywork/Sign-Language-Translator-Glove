@@ -42,4 +42,20 @@ def test_api_serial_ports():
     with TestClient(app) as client:
         res = client.get("/api/serial/ports")
         assert res.status_code == 200
-        assert "ports" in res.json()
+        data = res.json()
+        assert "ports" in data
+        assert "usb_ports" in data
+        assert "bluetooth_ports" in data
+        assert "other_com_ports" in data
+        assert "supported_bauds" in data
+        assert 115200 in data["supported_bauds"]
+
+
+def test_api_serial_status():
+    with TestClient(app) as client:
+        res = client.get("/api/serial/status")
+        assert res.status_code == 200
+        data = res.json()
+        assert "is_connected" in data
+        assert "connection_type" in data
+        assert "baud_rate" in data

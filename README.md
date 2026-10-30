@@ -225,10 +225,25 @@ The system features dual operating modes switchable with a single click in the t
 4. Watch the **3D Hand Visualizer** flex its fingers and tilt according to the biomechanical simulator at 50Hz, with live classification and voice speech!
 
 ### Mode 2: Real ESP32 Hardware Glove Mode
-1. Pair your laptop with the Bluetooth device `ISL-Glove-ESP32` (or connect via USB cable).
-2. Go to the **Settings** tab in the dashboard.
-3. Select the ESP32 COM port and click **"Connect to Glove Hardware"**.
-4. The system switches to real-time hardware telemetry streaming.
+The system provides 3 flexible hardware connection options:
+
+1. **Option 1: Direct USB Port (Wired USB Cable - Lowest Latency)**
+   - Connect the ESP32 to your PC using a Micro-USB or USB-C cable.
+   - In the web dashboard, go to **Settings > 🔌 USB Port (Wired)**.
+   - Click **"⚡ 1-Click Auto-Detect & Connect"** or select your USB port (e.g. `COM3 - Silicon Labs CP2102` or `COM5 - WCH CH340`) and click **"Connect USB Port"**.
+   - Configurable baud rates: 115200 (Default Recommended), 230400, 460800, 921600.
+   - Operating in USB-only mode conserves ESP32 RAM, lowers power draw, and frees all ADC2 channels.
+
+2. **Option 2: COM Port / Bluetooth (Wireless SPP or Custom COM Port)**
+   - Pair your PC with `ISL-Glove-ESP32` in Windows Bluetooth Settings (PIN: 1234).
+   - Go to **Settings > 📶 COM Port (Bluetooth/Custom)**.
+   - Select the assigned Bluetooth COM port (e.g. `COM4`) or type any custom COM port name in the manual entry field.
+   - Click **"Connect to COM Port"**.
+
+3. **Option 3: Browser Web Serial API (Direct Browser USB Port)**
+   - In Google Chrome or Microsoft Edge, go to **Settings > 🌐 Web Serial (Browser USB)**.
+   - Click **"Connect via Web Serial"** and choose your ESP32 from the native browser popup.
+   - Streams directly into the web client with zero backend driver requirements!
 
 ---
 
@@ -320,9 +335,26 @@ When a gesture is recognized with confidence $\ge 70\%$, the system synthesizes 
 2. Install the **ESP32 Board Package**:
    - `File -> Preferences -> Additional Boards Manager URLs`: `https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json`
    - `Tools -> Board -> ESP32 Arduino -> ESP32 Dev Module`.
-3. Open [`esp32/ISL_Glove.ino`](file:///d:/ISL-%20Glove/esp32/ISL_Glove.ino).
-4. Verify pin numbers in [`esp32/config.h`](file:///d:/ISL-%20Glove/esp32/config.h).
+3. Open [`esp32/ISL_Glove/ISL_Glove.ino`](file:///d:/ISL-%20Glove/esp32/ISL_Glove/ISL_Glove.ino).
+   *(Note: Arduino IDE requires the sketch file to be inside a folder named `ISL_Glove`)*.
+4. Verify pin numbers in [`esp32/ISL_Glove/config.h`](file:///d:/ISL-%20Glove/esp32/ISL_Glove/config.h).
 5. Select Port and click **Upload** (Hold the `BOOT` button on ESP32 if upload stalls at `Connecting...`).
+6. **IMPORTANT**: Close the Arduino IDE **Serial Monitor** before connecting on the website! On Windows, a COM port can only be accessed by one application at a time. If the Serial Monitor is open, the web dashboard will receive `Access is denied (PermissionError)`.
+
+### Hardware Communication Modes (`config.h`)
+Configure your preferred communication mode in [`esp32/config.h`](file:///d:/ISL-%20Glove/esp32/config.h):
+```cpp
+#define COMM_MODE_USB       1    // Hardware USB Serial only (saves 30%+ RAM, disables Bluetooth radio)
+#define COMM_MODE_BT        2    // Bluetooth Serial (SPP) only (wireless COM port)
+#define COMM_MODE_DUAL      3    // Dual Mode: USB Port + Bluetooth COM Port simultaneously active
+
+#define DEFAULT_COMM_MODE   COMM_MODE_DUAL
+```
+
+The ESP32 also accepts dynamic runtime mode switching over serial:
+- `MODE_USB` / `SET_COMM_USB`: Switch to USB Port only.
+- `MODE_BT` / `SET_COMM_BT`: Switch to Bluetooth COM port only.
+- `MODE_DUAL` / `SET_COMM_DUAL`: Switch to Dual USB + Bluetooth mode.
 
 ### Packet Framing Protocol
 The glove transmits at 50Hz in standard NMEA-style framing:

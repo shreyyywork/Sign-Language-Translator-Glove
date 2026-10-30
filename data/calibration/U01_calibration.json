@@ -1,0 +1,42 @@
+{
+  "user_id": "U01",
+  "flex": {
+    "thumb": {
+      "straight": 132.32,
+      "relaxed": 127.86,
+      "bent": 332.32
+    },
+    "index": {
+      "straight": 2015.38,
+      "relaxed": 2006.73,
+      "bent": 2821.54
+    },
+    "middle": {
+      "straight": 58.0,
+      "relaxed": 56.9,
+      "bent": 258.0
+    },
+    "ring": {
+      "straight": 59.04,
+      "relaxed": 56.6,
+      "bent": 259.04
+    },
+    "little": {
+      "straight": 2005.05,
+      "relaxed": 2092.98,
+      "bent": 2807.07
+    }
+  },
+  "imu": {
+    "acc_offset": {
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0
+    },
+    "gyro_offset": {
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0
+    }
+  }
+}

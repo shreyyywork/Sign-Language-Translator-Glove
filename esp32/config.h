@@ -17,6 +17,20 @@
 #define SAMPLING_FREQ_HZ    50          // 50 Hz = 20ms sample period
 #define SAMPLE_PERIOD_MS    (1000 / SAMPLING_FREQ_HZ)
 
+// Connection Interface Modes:
+// COMM_MODE_USB  : Hardware USB Serial only (USB Cable / Port)
+//                  - Saves 30%+ SRAM & Flash memory
+//                  - Disables Bluetooth RF radio to save power
+//                  - Frees ADC2 pins for additional sensors
+// COMM_MODE_BT   : Bluetooth Serial (SPP) only (Wireless Virtual COM Port)
+// COMM_MODE_DUAL : Both USB Serial Port and Bluetooth COM Port enabled simultaneously
+#define COMM_MODE_USB       1
+#define COMM_MODE_BT        2
+#define COMM_MODE_DUAL      3
+
+// Default connection mode on boot
+#define DEFAULT_COMM_MODE   COMM_MODE_DUAL
+
 // ==========================================
 // 2. FLEX SENSOR GPIO PIN MAPPINGS (ADC1)
 // Note: Use ADC1 pins (GPIO 32-39) on ESP32 when using WiFi/Bluetooth

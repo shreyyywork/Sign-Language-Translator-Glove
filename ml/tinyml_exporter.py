@@ -168,10 +168,22 @@ TinyMLResult TinyMLClassifier::predict(const float features[TINYML_NUM_FEATURES]
 }}
 """
 
+        # Write to primary target
         with open(header_path, "w", encoding="utf-8") as f:
             f.write(header_code)
         with open(source_path, "w", encoding="utf-8") as f:
             f.write(source_code)
+
+        # Also mirror to esp32/ISL_Glove if exporting to esp32 root
+        isl_sketch_dir = os.path.join(self.esp32_dir, "ISL_Glove")
+        if os.path.isdir(isl_sketch_dir) and output_header_path is None:
+            try:
+                with open(os.path.join(isl_sketch_dir, "TinyML_Classifier.h"), "w", encoding="utf-8") as f:
+                    f.write(header_code)
+                with open(os.path.join(isl_sketch_dir, "TinyML_Classifier.cpp"), "w", encoding="utf-8") as f:
+                    f.write(source_code)
+            except Exception as e:
+                print(f"Warning: Failed to mirror TinyML to {isl_sketch_dir}: {e}")
 
         return {
             "header_path": header_path,
